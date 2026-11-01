@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emporio-agente"
+dynamic = ["version"]
+description = "Agente de atendimento da loja fictícia Empório da Música (desafio técnico Artefact)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.3.0",
+    "python-dotenv>=1.2.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.2.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "emporio_agente.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "e2e: testes de ponta a ponta que chamam a API da Anthropic (pulados sem ANTHROPIC_API_KEY)",
+]
