@@ -1,6 +1,12 @@
 import os
 
 import pytest
+from dotenv import load_dotenv
+
+from emporio_agente.config import ENV_PADRAO
+
+# Os e2e precisam da chave que pode estar só no .env (I2). override=False mantém o ambiente.
+load_dotenv(ENV_PADRAO, override=False)
 
 
 def pytest_collection_modifyitems(config, items):
