@@ -130,3 +130,14 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
 - **Orchestrator:** rodou a suíte (217 passed) e a CLI sem chave (exit 2 com instrução de configuração).
 - **Ainda não verificado contra a API real:** o adaptador Anthropic foi testado só com cliente falso. O ponto de controle do Diego é o primeiro teste real.
 - **Ponto de controle:** a implementação parou antes dos e2e, como o Diego pediu.
+
+### 2026-11-01 — Ponto de controle
+
+- **Diego decidiu:**
+  - mudar o filtro de preço da busca para o preço final com promoção (T2), com teste obrigatório do caso tabela acima do limite e promocional abaixo;
+  - registrar as 7 escolhas pendentes do agente e da CLI;
+  - rodar um roteiro de 12 conversas reais com critérios definidos por ele, sem corrigir comportamento antes do relatório.
+- **Orchestrator:**
+  - registrou T12–T18 e revisou T2 em `docs/decisoes.md`, apontando que o filtro era a T2, não a T3 citada no pedido;
+  - verificou que não havia chave de API na máquina (nem `.env` nem variável de ambiente) e pediu ao Diego que criasse o `.env`, sem manipular o segredo.
+- **Python:** fez a mudança do filtro em TDD (`cbb5467`), com 3 falhas vistas no vermelho e 5 testes novos (produtos 90 e 121, o inverso com `preco_min`, produto sem promoção e produto só com promoções inativas). A suíte passou para 222 testes. O Orchestrator conferiu à mão que o 90 aparece com teto de R$ 2.000.
