@@ -190,8 +190,14 @@ SCHEMAS: list[dict] = [
                     "type": "string",
                     "description": "Nome da categoria, ex.: 'Violões', 'Ukuleles', 'Guitarras'.",
                 },
-                "preco_min": {"type": "number", "description": "Preço mínimo em reais (opcional)."},
-                "preco_max": {"type": "number", "description": "Preço máximo em reais (opcional)."},
+                "preco_min": {
+                    "type": "number",
+                    "description": "Preço mínimo em reais (opcional). Considera o preço final: o promocional quando há promoção ativa, senão o de tabela.",
+                },
+                "preco_max": {
+                    "type": "number",
+                    "description": "Preço máximo em reais (opcional). Considera o preço final: o promocional quando há promoção ativa, senão o de tabela.",
+                },
                 "so_disponiveis": {
                     "type": "boolean",
                     "description": "Padrão true: lista só o que pode ser comprado agora. Use false para incluir esgotados, em breve e descontinuados.",
@@ -384,6 +390,11 @@ class Ferramentas:
             visao["especificacoes"] = p.specs
         return visao
 
+    def _preco_final(self, p: Produto) -> Decimal:
+        """Preço promocional quando há promoção ativa (maior desconto); senão o de tabela."""
+        promo = self._promocao_ativa.get(p.product_id)
+        return self._preco_promocional(p, promo.desconto_percent) if promo else p.preco
+
     @staticmethod
     def _preco_promocional(p: Produto, desconto_percent: int) -> Decimal:
         return arredondar(p.preco * (Decimal(100) - desconto_percent) / 100)
@@ -471,9 +482,9 @@ class Ferramentas:
             base = achados
 
         if preco_min is not None:
-            base = [p for p in base if p.preco >= preco_min]
+            base = [p for p in base if self._preco_final(p) >= preco_min]
         if preco_max is not None:
-            base = [p for p in base if p.preco <= preco_max]
+            base = [p for p in base if self._preco_final(p) <= preco_max]
 
         disponiveis = [p for p in base if self._codigo_disponibilidade(p) == "disponivel"]
         selecionados = disponiveis if so_disponiveis else base

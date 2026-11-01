@@ -120,6 +120,40 @@ def test_filtro_de_preco(ferr):
     assert set(ids(r)) == {126, 129}
 
 
+def test_filtro_de_preco_usa_preco_final_com_promocao(ferr):
+    # produto 90: tabela R$ 2.399,00, promocional R$ 1.967,18 (18%)
+    r = ferr.executar("buscar_produtos", {"texto": "crafter ht100", "preco_max": 2000})
+    assert ids(r) == [90]
+    assert r["produtos"][0]["preco_tabela"] == "R$ 2.399,00"
+    assert r["produtos"][0]["preco_promocional"] == "R$ 1.967,18"
+    # produto 121: tabela R$ 549,00, promocional R$ 439,20
+    assert ids(ferr.executar("buscar_produtos", {"texto": "ohana ck20", "preco_max": 500})) == [121]
+    assert ids(ferr.executar("buscar_produtos", {"texto": "ohana ck20", "preco_max": 400})) == []
+
+
+def test_preco_min_tambem_usa_preco_final(ferr):
+    assert ids(ferr.executar("buscar_produtos", {"texto": "crafter ht100", "preco_min": 1900})) == [90]
+    # a tabela (2.399) passaria de 2.000, mas o preço final (1.967,18) não
+    assert ids(ferr.executar("buscar_produtos", {"texto": "crafter ht100", "preco_min": 2000})) == []
+
+
+def test_filtro_de_preco_sem_promocao_usa_a_tabela(ferr):
+    assert ids(ferr.executar("buscar_produtos", {"texto": "takamine gd20", "preco_max": 2199})) == [95]
+    assert ids(ferr.executar("buscar_produtos", {"texto": "takamine gd20", "preco_max": 2198})) == []
+
+
+def test_filtro_ignora_promocao_inativa(ferr):
+    # produto 93 só tem promoções inativas: vale a tabela (R$ 11.499,00)
+    assert ids(ferr.executar("buscar_produtos", {"texto": "martin d28", "preco_max": 11000})) == []
+
+
+def test_description_do_schema_menciona_preco_final(ferr):
+    schema = next(s for s in ferr.schemas if s["name"] == "buscar_produtos")
+    props = schema["input_schema"]["properties"]
+    for chave in ("preco_min", "preco_max"):
+        assert "preço final" in props[chave]["description"].lower()
+
+
 def test_so_disponiveis_esconde_esgotado_mas_informa(ferr):
     r = ferr.executar("buscar_produtos", {"texto": "giannini gf-3d"})
     assert r["produtos"] == []
