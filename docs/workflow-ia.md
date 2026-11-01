@@ -122,3 +122,11 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
 
 - **Orchestrator:** conferiu as ferramentas à mão (Takamine GD20, pedido 8 com e sem identificação válida, promoção do 90, acessório, ferramenta inexistente) e despachou ao Python o agente (loop, janela de histórico, fallbacks) e a CLI (`--mensagem`, `--mostrar-ferramentas`, transcripts). A parada antes dos e2e continua mantida.
 - **Bloqueio identificado:** não há chave de API na máquina. A rodada 2 é testada só com fakes, e o Diego precisa criar o `.env` antes do ponto de controle.
+- **Python:** fez 4 commits e a suíte chegou a 217 testes. O protocolo de retorno por arquivo funcionou na primeira tentativa.
+  - **Agente:** loop com no máximo 5 iterações, janela cortada só em fala do cliente, turno com erro técnico descartado do histórico e `ferramentas_chamadas` vindo do resultado real das ferramentas, para servir de base aos e2e.
+  - **CLI:** REPL, `-m`, `--mostrar-ferramentas`, `--debug` e transcripts.
+  - **Vermelho real encontrado no TDD:** com a pasta de dados inexistente, a CLI mostrava um traceback. Foi corrigido para sair com código 2 e mensagem clara.
+  - Listou 7 escolhas a confirmar. A mais relevante: os transcripts guardam o telefone ou e-mail que o cliente digitou. Eles ficam fora do git, mas as conversas de exemplo precisam de revisão antes de entrar no repositório.
+- **Orchestrator:** rodou a suíte (217 passed) e a CLI sem chave (exit 2 com instrução de configuração).
+- **Ainda não verificado contra a API real:** o adaptador Anthropic foi testado só com cliente falso. O ponto de controle do Diego é o primeiro teste real.
+- **Ponto de controle:** a implementação parou antes dos e2e, como o Diego pediu.
