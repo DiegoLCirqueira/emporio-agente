@@ -12,6 +12,8 @@ from emporio_agente.agente import Agente, FerramentaChamada, RespostaAgente, cri
 from emporio_agente.config import RAIZ_REPO, Config, ConfigError
 from emporio_agente.provedores.base import ProvedorErro
 
+log = logging.getLogger(__name__)
+
 SAUDACAO = "Empório da Música: atendimento. Escreva sua mensagem (digite 'sair' para encerrar)."
 DESPEDIDA = "Até logo!"
 COMANDOS_SAIDA = {"sair", "exit", "quit"}
@@ -135,7 +137,8 @@ def main(
     try:
         agente = (fabrica or criar_agente)(config)
     except ProvedorErro as e:
-        print(f"{AJUDA_ENV}\n({e})", file=sys.stderr)
+        log.debug("ProvedorErro ao criar o agente: %s", e)
+        print(AJUDA_ENV, file=sys.stderr)
         return 2
     except OSError as e:
         print(f"Não consegui ler os dados da loja em {config.dados_dir}: {e}", file=sys.stderr)

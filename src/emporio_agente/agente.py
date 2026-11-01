@@ -159,6 +159,6 @@ class Agente:
 def criar_agente(config: Config | None = None) -> Agente:
     """Monta Config + dados + ferramentas + provedor Anthropic. Levanta ProvedorErro sem chave."""
     config = config or Config.from_env()
+    provedor = ProvedorAnthropic(modelo=config.modelo, api_key=config.anthropic_api_key)  # falha cedo sem chave
     ferramentas = Ferramentas(carregar_dados(config.dados_dir))
-    provedor = ProvedorAnthropic(modelo=config.modelo, api_key=config.anthropic_api_key)
     return Agente(config, provedor, ferramentas)
