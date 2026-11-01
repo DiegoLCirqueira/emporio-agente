@@ -49,7 +49,7 @@ São escolhas de implementação sem impacto de arquitetura, registradas para tr
 | # | Tema | Escolha |
 |---|---|---|
 | T1 | Ambiguidade da busca | `ambiguo: true` quando o texto casa pelo nome com 2 a 5 produtos disponíveis. Com 6 ou mais, volta uma lista ampla (até 10) com aviso para refinar. |
-| T2 | Filtro de preço | `preco_min`/`preco_max` comparam com o preço de tabela, não com o promocional. |
+| T2 | Filtro de preço | `preco_min`/`preco_max` comparam com o **preço final**: o promocional quando há promoção ativa (DD2), ou o de tabela quando não há. A resposta mostra os dois valores. *(Revisado pelo Diego no ponto de controle; antes comparava com o preço de tabela.)* |
 | T3 | Nada disponível | Com `so_disponiveis=true` e nenhum disponível, a ferramenta devolve `produtos_indisponiveis` com rótulo, para o agente não negar um item que existe (ex.: o 96, esgotado). |
 | T4 | Parcelamento | O pagamento em 1x nunca é bloqueado. Os mínimos valem de 2x em diante. Parcela abaixo do mínimo volta com `permitido: false`, o motivo e o máximo de parcelas permitido. Mais de 12x é argumento inválido. |
 | T5 | `calcular_pagamento` | Um valor livre é tratado como preço de tabela. Com `product_id`, usa o preço promocional se houver promoção ativa, e o PIX não se soma. |
@@ -59,6 +59,13 @@ São escolhas de implementação sem impacto de arquitetura, registradas para tr
 | T9 | Chave de API | Vem do `Config`, que lê o `.env` sem alterar `os.environ`. Sem chave, o provedor levanta `ProvedorErro`. |
 | T10 | Data nas ferramentas | Nenhuma ferramenta usa a data de referência. Os prazos ficam no prompt e nas políticas. |
 | T11 | Hora do dia | O agente só conhece a data, não a hora. Ele não afirma se a loja está aberta agora: informa o horário do dia. (Correção do Orchestrator no prompt.) |
+| T12 | System prompt no provedor | O agente envia o prompt inteiro como uma string (`montar_system_prompt`) com `cache_control`. A variante em blocos estável/variável do `politicas.py` não é usada: com `REFERENCE_DATE` fixa, o cache funciona igual. |
+| T13 | Turno com falha | Um turno que falha por erro técnico (ProvedorErro, resposta vazia ou cortada no meio de uma ferramenta) **não entra no histórico**, e o cliente pode repetir. O fallback por limite de iterações e a resposta cortada com texto entram só como o par cliente/assistente, sem as idas e vindas de ferramenta. |
+| T14 | Sinal de falha | `RespostaAgente.falhou` indica uma resposta de fallback. A CLI com `--mensagem` sai com código 1 quando `falhou=True`, e com 0 caso contrário. |
+| T15 | Dados pessoais nos registros locais | `--mostrar-ferramentas` e os transcripts mostram os argumentos exatos, inclusive o telefone ou e-mail digitado para identificar o pedido. É uma ferramenta de avaliação local e `transcripts/` está no `.gitignore`. As conversas de exemplo publicadas são revisadas antes do commit. |
+| T16 | Tamanho da resposta | `max_tokens` fixo em 1024 por chamada, sem variável de ambiente. |
+| T17 | Rótulos da CLI | "Você:" e "Atendente:", neutros. A persona vem só do prompt. |
+| T18 | Ctrl+C | Ctrl+C no meio de uma resposta encerra a sessão, não só cancela o turno. |
 
 ## Processo
 
