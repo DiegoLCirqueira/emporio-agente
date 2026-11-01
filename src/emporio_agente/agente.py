@@ -8,6 +8,7 @@ from emporio_agente.dados import carregar_dados
 from emporio_agente.ferramentas import Ferramentas
 from emporio_agente.politicas import montar_system_prompt
 from emporio_agente.provedores.anthropic import ProvedorAnthropic
+from emporio_agente.provedores.gemini import ProvedorGemini
 from emporio_agente.provedores.base import (
     COTA_ESGOTADA,
     Mensagem,
@@ -162,9 +163,16 @@ class Agente:
         return RespostaAgente(texto, tuple(chamadas), uso, falhou=falhou)
 
 
+def criar_provedor(config: Config) -> Provedor:
+    """Provedor escolhido pelo config; exige só a chave dele (ProvedorErro se faltar)."""
+    if config.provedor == "anthropic":
+        return ProvedorAnthropic(modelo=config.modelo, api_key=config.anthropic_api_key)
+    return ProvedorGemini(modelo=config.modelo, api_key=config.gemini_api_key)
+
+
 def criar_agente(config: Config | None = None) -> Agente:
-    """Monta Config + dados + ferramentas + provedor Anthropic. Levanta ProvedorErro sem chave."""
+    """Monta Config + dados + ferramentas + provedor. Levanta ProvedorErro sem a chave do provedor."""
     config = config or Config.from_env()
-    provedor = ProvedorAnthropic(modelo=config.modelo, api_key=config.anthropic_api_key)  # falha cedo sem chave
+    provedor = criar_provedor(config)  # falha cedo sem chave
     ferramentas = Ferramentas(carregar_dados(config.dados_dir))
     return Agente(config, provedor, ferramentas)

@@ -29,7 +29,7 @@ def resposta(texto, ferramentas=(), falhou=False):
 
 @pytest.fixture
 def cfg(tmp_path):
-    return replace(Config.from_env(env_file=tmp_path / "sem.env"), anthropic_api_key="sk-teste")
+    return replace(Config.from_env(env_file=tmp_path / "sem.env"), gemini_api_key="chave-falsa")
 
 
 def rodar(argv, cfg, agente=None, **kw):
@@ -135,13 +135,22 @@ def test_repl_mostra_ferramentas_a_cada_turno(cfg, capsys, monkeypatch):
 
 
 def test_sem_chave_explica_o_env_e_sai_com_2(cfg, capsys):
-    sem_chave = replace(cfg, anthropic_api_key=None)
+    sem_chave = replace(cfg, provedor="gemini", gemini_api_key=None)
     codigo = main(["--mensagem", "oi"], config=sem_chave)  # fábrica real: levanta ProvedorErro
     capturado = capsys.readouterr()
     assert codigo == 2
-    assert ".env" in capturado.err and "ANTHROPIC_API_KEY" in capturado.err
+    assert ".env" in capturado.err and "GEMINI_API_KEY" in capturado.err
+    assert "aistudio.google.com/apikey" in capturado.err
+    assert "ANTHROPIC_API_KEY" not in capturado.err
     assert ".env.example" in capturado.err
     assert "Traceback" not in capturado.err + capturado.out
+
+
+def test_sem_chave_cita_a_variavel_da_anthropic_quando_e_o_provedor(cfg, capsys):
+    sem_chave = replace(cfg, provedor="anthropic", modelo="claude-haiku-5-5", anthropic_api_key=None)
+    assert main(["-m", "oi"], config=sem_chave) == 2
+    err = capsys.readouterr().err
+    assert "ANTHROPIC_API_KEY" in err and "GEMINI_API_KEY" not in err
 
 
 def test_erro_de_configuracao_sai_com_2(tmp_path, capsys, monkeypatch):

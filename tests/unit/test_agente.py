@@ -309,11 +309,25 @@ def test_historico_e_somente_leitura(cfg, ferr):
 # --- fábrica ---------------------------------------------------------------------------
 
 
-def test_criar_agente_monta_tudo_com_a_chave_do_config(cfg):
-    ag = criar_agente(replace(cfg, anthropic_api_key="sk-ant-teste"))
-    assert isinstance(ag, Agente)
+def test_criar_agente_usa_gemini_por_padrao(cfg):
+    from emporio_agente.provedores.gemini import ProvedorGemini
+
+    ag = criar_agente(replace(cfg, gemini_api_key="chave-falsa"))
+    assert isinstance(ag, Agente) and isinstance(ag._provedor, ProvedorGemini)
 
 
-def test_criar_agente_sem_chave_levanta_provedor_erro(cfg):
+def test_criar_agente_com_anthropic(cfg):
+    from emporio_agente.provedores.anthropic import ProvedorAnthropic
+
+    ag = criar_agente(replace(cfg, provedor="anthropic", modelo="claude-haiku-5-5", anthropic_api_key="chave-falsa"))
+    assert isinstance(ag._provedor, ProvedorAnthropic)
+
+
+def test_criar_agente_exige_so_a_chave_do_provedor_escolhido(cfg):
+    # chave da Anthropic não serve para o provedor gemini, e vice-versa
+    with pytest.raises(ProvedorErro, match="GEMINI_API_KEY"):
+        criar_agente(replace(cfg, provedor="gemini", gemini_api_key=None, anthropic_api_key="chave-falsa"))
     with pytest.raises(ProvedorErro, match="ANTHROPIC_API_KEY"):
-        criar_agente(replace(cfg, anthropic_api_key=None))
+        criar_agente(
+            replace(cfg, provedor="anthropic", modelo="claude-haiku-5-5", anthropic_api_key=None, gemini_api_key="chave-falsa")
+        )

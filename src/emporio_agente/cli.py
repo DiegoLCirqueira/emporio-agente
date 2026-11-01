@@ -17,11 +17,19 @@ log = logging.getLogger(__name__)
 SAUDACAO = "Empório da Música: atendimento. Escreva sua mensagem (digite 'sair' para encerrar)."
 DESPEDIDA = "Até logo!"
 COMANDOS_SAIDA = {"sair", "exit", "quit"}
-AJUDA_ENV = (
-    "Não encontrei a chave da API da Anthropic (ANTHROPIC_API_KEY).\n"
-    "Para configurar: copie .env.example para .env na raiz do projeto e preencha "
-    "ANTHROPIC_API_KEY=sua-chave (ou defina a variável de ambiente ANTHROPIC_API_KEY)."
-)
+LINK_CHAVE_GEMINI = "https://aistudio.google.com/apikey"
+
+
+def ajuda_chave(config: Config) -> str:
+    variavel = config.variavel_chave
+    linhas = [
+        f"Não encontrei a chave da API do provedor '{config.provedor}' ({variavel}).",
+        f"Para configurar: copie .env.example para .env na raiz do projeto e preencha {variavel}=sua-chave "
+        f"(ou defina a variável de ambiente {variavel}).",
+    ]
+    if config.provedor == "gemini":
+        linhas.append(f"Você pode criar uma chave gratuita em {LINK_CHAVE_GEMINI}.")
+    return "\n".join(linhas)
 
 
 class _SemTraceback(logging.Formatter):
@@ -138,7 +146,7 @@ def main(
         agente = (fabrica or criar_agente)(config)
     except ProvedorErro as e:
         log.debug("ProvedorErro ao criar o agente: %s", e)
-        print(AJUDA_ENV, file=sys.stderr)
+        print(ajuda_chave(config), file=sys.stderr)
         return 2
     except OSError as e:
         print(f"Não consegui ler os dados da loja em {config.dados_dir}: {e}", file=sys.stderr)
