@@ -25,9 +25,22 @@ Decisões do Diego em 2026-11-01 sobre as opções de `docs/opcoes-arquitetura.m
 | DD5 | Parcelamento | Vale o §3.1: até 3x com parcela mínima de R$50; 4–6x com mínima de R$80; 7–12x com mínima de R$100. |
 | DD6 | Defeito entre 31 e 90 dias | O agente informa as duas regras (§4.2 e §8.1) e encaminha para humano. |
 | DD7 | Identificação | `order_id` + telefone **ou** e-mail do titular, com match exato na ferramenta. |
-| DD8 | Totais divergentes | Usar `orders.total_brl` como valor pago, sem comentar a divergência. *(Recomendação adotada por padrão; o Diego não se manifestou. Pode ser revista.)* |
-| DD9 | Disponibilidade | Disponível = `status=active` e `stock_quantity>0`. O produto 130 (`coming_soon`) aparece como "em breve". *(Recomendação adotada por padrão; o Diego não se manifestou. Pode ser revista.)* |
+| DD8 | Totais divergentes | Usar `orders.total_brl` como valor pago, sem comentar a divergência com o cliente. A divergência dos pedidos 3 e 20 é citada na tabela de problemas do README. *(Confirmado pelo Diego.)* |
+| DD9 | Disponibilidade | Disponível = `status=active` e `stock_quantity>0`. O produto 130 (`coming_soon`) aparece como "em breve". *(Confirmado pelo Diego.)* |
 | DD10 | Provedor padrão | Claude Haiku 5.5 (ver D4). |
+
+## Implementação (decisões de 2026-11-01)
+
+| # | Tema | Decisão |
+|---|---|---|
+| I1 | `politicas.md` | Fica dentro do pacote (`src/emporio_agente/politicas.md`), distribuído como package data. |
+| I2 | `.env` | `config.py` lê o `.env` (python-dotenv). Os testes e2e continuam pulados sem `ANTHROPIC_API_KEY`, para o avaliador rodar os unitários sem custo. |
+| I3 | Busca de produto | Tolerante a maiúsculas, acentos, espaços e variações de nome ("takamine gd 20" encontra o Takamine GD20). Com mais de um resultado provável, o agente pergunta qual o cliente quer. Coberto por teste. |
+| I4 | Preços | Calculados com `Decimal` e sempre formatados em reais no padrão brasileiro (`R$ 1.234,56`). Coberto por teste. |
+| I5 | Erros das ferramentas | Produto ou pedido não encontrado e identificação que não confere retornam mensagens estruturadas, nunca exceções cruas para o modelo. Coberto por teste. |
+| I6 | PII | Teste específico garante que nenhuma ferramenta devolve dados pessoais completos (e-mail, telefone, endereço) sem identificação válida. |
+| I7 | Ordem e ponto de controle | Ordem: config → dados → ferramentas → `politicas.md` → provedor Anthropic → agente → CLI → e2e. **Parada obrigatória depois da CLI e antes dos e2e:** o Diego conversa com o agente para avaliar persona, escopo e comportamento. |
+| I8 | README | Completado no final. |
 
 ## Processo
 
