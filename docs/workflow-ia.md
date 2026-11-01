@@ -99,3 +99,26 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
     - **Python:** itens 1, 2, 3 e 5 (config, dados, ferramentas, provedor Anthropic). O Python comita os próprios arquivos com caminhos explícitos, com um commit verde por ciclo TDD que registra o vermelho no corpo, e faz push por item.
     - **AI Engineer:** item 4 (`politicas.md` curado com citação de seção, `politicas.py` com o system prompt e os testes dos fatos críticos). Os commits do AI Engineer ficam com o Orchestrator.
 - **Decisão de processo do Orchestrator:** cada commit fica verde, com teste e implementação juntos, em vez de um commit separado com o teste falhando. Assim a `main` nunca fica quebrada, e a evidência do vermelho fica no corpo da mensagem.
+- **Correção:** o segundo despacho também falhou antes de chegar aos agentes, desta vez por aspas dentro de um heredoc no shell. Os prompts passaram a ser gravados em arquivo com a ferramenta de escrita.
+- **AI Engineer (item 4):**
+  - curou o `politicas.md` com a seção de origem em cada trecho e notas de curadoria para DD2, DD4, DD5 e DD6;
+  - escreveu o `politicas.py` com o prompt dividido em parte estável (cache) e variável (data);
+  - escreveu 29 testes de fatos críticos.
+
+  O Orchestrator conferiu os fatos no PDF (CNPJ, endereço, prazos, campanhas) e comitou.
+- **Correção do Orchestrator, em TDD:** o prompt mandava usar a data "para saber se a loja está aberta", mas o agente não recebe a hora. O Orchestrator escreveu um teste falhando e trocou a instrução: o agente informa o horário do dia em vez de afirmar que a loja está aberta.
+- **Python (itens 1, 2, 3 e 5):**
+  - 7 commits, cada um com o vermelho registrado no corpo, e 179 testes na suíte inteira;
+  - busca tolerante com radical, junção de tokens ("gd" + "20") e fallback por difflib;
+  - erro idêntico para pedido inexistente e identificação errada (anti-enumeração);
+  - teste de PII com mais de 150 chamadas, validado por mutação: com o e-mail sem máscara, o teste quebra.
+
+  O Python listou 10 escolhas técnicas não previstas em `docs/decisoes.md`. O Orchestrator as aceitou e registrou como T1–T10, revisáveis pelo Diego.
+- **Incidente de processo:** o Python terminou à 01h28, mas o `maestri ask` de retorno falhou por aspas no shell (relatório longo inline), e o terminal ficou preso. O Orchestrator só percebeu às 12h28, quando foi checar. Resultado: cerca de 11 horas de prazo paradas. Os commits já estavam no remoto, então nada se perdeu além do tempo.
+  - **Mitigação:** os relatórios passam a ser escritos em arquivo (`.relatorio-*.md`, ignorado pelo git), e o `ask` de retorno só leva o caminho.
+  - **Lição:** um despacho longo precisa de checagem periódica (`maestri check`), não só da espera pela notificação.
+
+### 2026-11-01 — Implementação, rodada 2 (itens 6 e 7)
+
+- **Orchestrator:** conferiu as ferramentas à mão (Takamine GD20, pedido 8 com e sem identificação válida, promoção do 90, acessório, ferramenta inexistente) e despachou ao Python o agente (loop, janela de histórico, fallbacks) e a CLI (`--mensagem`, `--mostrar-ferramentas`, transcripts). A parada antes dos e2e continua mantida.
+- **Bloqueio identificado:** não há chave de API na máquina. A rodada 2 é testada só com fakes, e o Diego precisa criar o `.env` antes do ponto de controle.
