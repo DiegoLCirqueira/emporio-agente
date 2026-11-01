@@ -59,8 +59,7 @@ def _para_api(m: Mensagem) -> dict[str, Any]:
     if not m.chamadas_ferramenta and not m.resultados_ferramenta:
         return {"role": m.papel, "content": m.texto}
     blocos: list[dict[str, Any]] = []
-    # tool_result precisa vir antes de qualquer texto na mensagem do usuário.
-    for r in m.resultados_ferramenta:
+    for r in m.resultados_ferramenta:  # tool_result vem antes de qualquer texto
         bloco: dict[str, Any] = {
             "type": "tool_result",
             "tool_use_id": r.chamada_id,
@@ -71,11 +70,9 @@ def _para_api(m: Mensagem) -> dict[str, Any]:
         blocos.append(bloco)
     if m.texto:
         blocos.append({"type": "text", "text": m.texto})
-    for c in m.chamadas_ferramenta:
-        blocos.append({"type": "tool_use", "id": c.id, "name": c.nome, "input": c.argumentos})
-    # Em mensagens do assistente o texto vem antes das chamadas.
-    if m.papel == "assistant" and m.texto:
-        blocos.insert(0, blocos.pop(len(m.resultados_ferramenta)))
+    blocos.extend(
+        {"type": "tool_use", "id": c.id, "name": c.nome, "input": c.argumentos} for c in m.chamadas_ferramenta
+    )
     return {"role": m.papel, "content": blocos}
 
 
