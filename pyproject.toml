@@ -16,6 +16,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=9.2.0"]
 
+[project.scripts]
+emporio-agente = "emporio_agente.cli:main"
+
 [tool.setuptools.dynamic]
 version = { attr = "emporio_agente.__version__" }
 
