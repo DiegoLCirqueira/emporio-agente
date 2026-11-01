@@ -158,3 +158,28 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
   - **AI Engineer:** verificação em fontes oficiais do Google (free tier do modelo, limites RPM/RPD, termos de uso de dados, exigência de cartão).
 
   O roteiro de 12 conversas fica para depois do adaptador.
+- **AI Engineer (pesquisa):**
+  - confirmou em fontes oficiais que o `gemini-3.8-flash` está no free tier, é Stable e suporta function calling;
+  - confirmou o Flash-Lite `gemini-3.5-flash-lite`, os termos de uso de dados (uso para melhoria dos produtos e revisão humana), a ausência de exigência de cartão e o Brasil entre as regiões atendidas;
+  - os limites RPM/RPD **não são publicados** e só aparecem no AI Studio, logado.
+- **Python:**
+  - adaptador Gemini em TDD com `google-genai` 2.31.0 (a versão estável mais nova com pelo menos 2 semanas; as 2.32 a 2.34 foram descartadas pela regra);
+  - devolução da `thought_signature` no histórico, retry em 429/5xx e `COTA_ESGOTADA` com mensagem própria;
+  - 265 testes.
+
+  O teste de fumaça real pegou 503/504 do serviço.
+- **Orchestrator:**
+  - varreu o repositório e o histórico em busca de chaves (nenhuma);
+  - reescreveu a D4 em `docs/decisoes.md` e registrou T19–T22;
+  - despachou o README ao Docs/QA (revisado e comitado) e o roteiro real ao AI Engineer;
+  - quando a conversa 3 falhou com 503/504 no `gemini-3.8-flash`, pediu um diagnóstico para separar sobrecarga do serviço de defeito do adaptador: uma rodada com o Flash-Lite e o tempo de cada erro medido.
+- **Roteiro real (AI Engineer):**
+  - **Gemini 3.8 Flash:** as 12 chamadas falharam, com 503 em ~3 s (sobrecarga) e 504 em ~60 s (prazo).
+  - **Flash-Lite:** funcionou. O function calling real ficou validado, sem nenhum 400. As 12 conversas rodaram com ele, em 39 requisições no total e sem nenhum 429.
+  - **Resultado:** 7 ✅, 3 ⚠️, 2 ❌ e **nenhum vazamento de PII**, verificado pelo AI Engineer e de novo, de forma independente, pelo Orchestrator.
+  - **Falhas:** o agente afirmou "estamos abertos" sem saber a hora (o modelo ignorou a T11) e inventou "pedido já entregue" a partir da previsão vencida.
+  - **Parciais:**
+    - a busca corta em 10 por ordem de id e deixa um item mais barato de fora;
+    - "tem promoções ativas" foi afirmado sem chamar a ferramenta;
+    - "palheta" foi resolvida pela política, sem ferramenta, o que é discutível contra o critério.
+  - Nada foi corrigido, conforme o Diego pediu.
