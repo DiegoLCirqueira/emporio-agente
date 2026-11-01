@@ -42,6 +42,14 @@ FORMAS_DE_PAGAMENTO = {
 }
 MAX_PARCELAS = 12
 
+STATUS_PEDIDO = {
+    "pending": "Pendente",
+    "confirmed": "Confirmado",
+    "shipped": "Enviado",
+    "delivered": "Entregue",
+    "cancelled": "Cancelado",
+}
+
 DISPONIBILIDADE = {
     "disponivel": "Disponível",
     "esgotado": "Esgotado no momento",
@@ -205,6 +213,29 @@ SCHEMAS: list[dict] = [
                 "product_id": {"type": "integer", "description": "Identificador do produto."},
                 "nome": {"type": "string", "description": "Nome ou parte do nome do produto."},
             },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "consultar_pedido",
+        "description": (
+            "Consulta o status de UM pedido (situação, itens, total, forma de pagamento, rastreio e "
+            "previsão de entrega). Só funciona com o número do pedido E o telefone OU o e-mail "
+            "cadastrado do titular: peça os dois ao cliente antes de chamar. Se a ferramenta "
+            "responder PEDIDO_OU_IDENTIFICACAO_INVALIDOS, diga apenas que não foi possível localizar "
+            "o pedido com esses dados, sem indicar qual deles está errado e sem dar dicas. "
+            "Nunca revele dados pessoais além do que a ferramenta devolve."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "order_id": {"type": "integer", "description": "Número do pedido."},
+                "telefone_ou_email": {
+                    "type": "string",
+                    "description": "Telefone (com DDD) ou e-mail cadastrado do titular do pedido.",
+                },
+            },
+            "required": ["order_id", "telefone_ou_email"],
             "additionalProperties": False,
         },
     },
@@ -597,3 +628,67 @@ class Ferramentas:
                 observacoes.append("Parcelado sem juros.")
         resposta["observacoes"] = observacoes
         return resposta
+
+    # pedidos -------------------------------------------------------------------------
+
+    def consultar_pedido(self, order_id: int, telefone_ou_email: str) -> dict:
+        ident = telefone_ou_email.strip()
+        if "@" in ident:
+            titular = self._dados.titular_do_pedido(order_id, email=ident)
+        else:
+            titular = self._dados.titular_do_pedido(order_id, telefone=ident)
+        pedido = self._dados.pedido(order_id)
+        if titular is None or pedido is None:
+            # Mesma resposta para pedido inexistente e identificação que não confere.
+            raise ErroFerramenta(
+                "PEDIDO_OU_IDENTIFICACAO_INVALIDOS",
+                "Não foi possível localizar um pedido com os dados informados.",
+            )
+        itens = []
+        for item in self._dados.itens_do_pedido(order_id):
+            produto = self._dados.produto(item.product_id)
+            itens.append({"nome": produto.nome if produto else "Produto indisponível no catálogo", "quantidade": item.quantidade})
+        saida: dict[str, Any] = {
+            "order_id": pedido.order_id,
+            "status": {"codigo": pedido.status, "rotulo": STATUS_PEDIDO.get(pedido.status, pedido.status)},
+            "data_pedido": pedido.order_date.strftime("%d/%m/%Y"),
+            "itens": itens,
+            "total": formatar_brl(pedido.total),
+            "forma_pagamento": _rotulo_pagamento(pedido.payment_method),
+        }
+        if pedido.tracking_code:
+            saida["rastreio"] = pedido.tracking_code
+        if pedido.estimated_delivery:
+            saida["previsao_entrega"] = pedido.estimated_delivery.strftime("%d/%m/%Y")
+        if pedido.status == "cancelled" and pedido.notes:
+            saida["observacoes"] = pedido.notes
+        return {
+            "pedido": saida,
+            "titular": {
+                "primeiro_nome": titular.nome.split()[0],
+                "telefone_mascarado": _mascarar_telefone(titular.telefone),
+                "email_mascarado": _mascarar_email(titular.email),
+            },
+        }
+
+
+def _rotulo_pagamento(forma: str) -> str:
+    if forma == "pix":
+        return "PIX"
+    if forma == "boleto":
+        return "Boleto"
+    if forma == "debit":
+        return "Cartão de débito"
+    if forma.startswith("credit_"):
+        return f"Cartão de crédito em {forma.removeprefix('credit_')}"
+    return forma
+
+
+def _mascarar_telefone(telefone: str) -> str:
+    digitos = re.sub(r"\D", "", telefone)
+    return f"({digitos[:2]}) {digitos[2]}****-{digitos[-4:]}"
+
+
+def _mascarar_email(email: str) -> str:
+    usuario, _, dominio = email.partition("@")
+    return f"{usuario[:1]}***@{dominio}"
