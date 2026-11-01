@@ -209,3 +209,10 @@ def test_parte_variavel_contem_so_a_data():
 def test_prompt_e_estavel_mais_variavel_nessa_ordem():
     assert montar_system_prompt(REF) == montar_parte_estavel() + "\n\n" + montar_parte_variavel(REF)
     assert montar_system_prompt(date(2026, 4, 1)).startswith(montar_parte_estavel())
+
+
+def test_parte_variavel_nao_induz_a_dizer_se_esta_aberto_agora():
+    # O agente só conhece a data, não a hora: não pode afirmar "estamos abertos agora".
+    v = montar_parte_variavel(REF)
+    assert "para saber se a loja está aberta" not in v
+    assert "hora atual" in v

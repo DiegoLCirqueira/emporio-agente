@@ -83,7 +83,8 @@ def montar_parte_variavel(reference_date: date) -> str:
     """Data de referência ("hoje"). Fica fora do bloco em cache."""
     dia = _DIAS_SEMANA[reference_date.weekday()]
     return (f"# Data de hoje\nHoje é {dia}, {reference_date:%d/%m/%Y} "
-            f"({reference_date.isoformat()}). Use esta data para prazos e para saber se a loja está aberta.")
+            f"({reference_date.isoformat()}). Use esta data para prazos. "
+            "Você não sabe a hora atual: se perguntarem se a loja está aberta agora, informe o horário do dia.")
 
 
 def montar_system_prompt(reference_date: date) -> str:
