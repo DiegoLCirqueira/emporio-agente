@@ -42,6 +42,24 @@ Decisões do Diego em 2026-11-01 sobre as opções de `docs/opcoes-arquitetura.m
 | I7 | Ordem e ponto de controle | Ordem: config → dados → ferramentas → `politicas.md` → provedor Anthropic → agente → CLI → e2e. **Parada obrigatória depois da CLI e antes dos e2e:** o Diego conversa com o agente para avaliar persona, escopo e comportamento. |
 | I8 | README | Completado no final. |
 
+## Detalhes técnicos da implementação (propostos pelo Python, aceitos pelo Orchestrator)
+
+São escolhas de implementação sem impacto de arquitetura, registradas para transparência. O Diego pode revisar qualquer uma.
+
+| # | Tema | Escolha |
+|---|---|---|
+| T1 | Ambiguidade da busca | `ambiguo: true` quando o texto casa pelo nome com 2 a 5 produtos disponíveis. Com 6 ou mais, volta uma lista ampla (até 10) com aviso para refinar. |
+| T2 | Filtro de preço | `preco_min`/`preco_max` comparam com o preço de tabela, não com o promocional. |
+| T3 | Nada disponível | Com `so_disponiveis=true` e nenhum disponível, a ferramenta devolve `produtos_indisponiveis` com rótulo, para o agente não negar um item que existe (ex.: o 96, esgotado). |
+| T4 | Parcelamento | O pagamento em 1x nunca é bloqueado. Os mínimos valem de 2x em diante. Parcela abaixo do mínimo volta com `permitido: false`, o motivo e o máximo de parcelas permitido. Mais de 12x é argumento inválido. |
+| T5 | `calcular_pagamento` | Um valor livre é tratado como preço de tabela. Com `product_id`, usa o preço promocional se houver promoção ativa, e o PIX não se soma. |
+| T6 | Status do pedido | Rótulos: Pendente, Confirmado, Enviado, Entregue, Cancelado. Datas em dd/mm/aaaa. |
+| T7 | Contato do titular | `consultar_pedido` devolve telefone e e-mail mascarados. |
+| T8 | Itens do pedido | Mostra o nome atual do catálogo, sem preço por item (`order_items` não tem preço). |
+| T9 | Chave de API | Vem do `Config`, que lê o `.env` sem alterar `os.environ`. Sem chave, o provedor levanta `ProvedorErro`. |
+| T10 | Data nas ferramentas | Nenhuma ferramenta usa a data de referência. Os prazos ficam no prompt e nas políticas. |
+| T11 | Hora do dia | O agente só conhece a data, não a hora. Ele não afirma se a loja está aberta agora: informa o horário do dia. (Correção do Orchestrator no prompt.) |
+
 ## Processo
 
 - Repositório público: https://github.com/DiegoLCirqueira/emporio-agente. Push ao fim de cada etapa concluída, nunca force push.
