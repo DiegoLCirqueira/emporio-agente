@@ -18,7 +18,7 @@ O agente responde dúvidas recorrentes (horários, preço e disponibilidade, sta
 
 ## Como rodar
 
-Requisitos: Python 3.12+ e uma chave de API da Anthropic (só para rodar o agente e os testes e2e; os testes unitários não precisam dela).
+Requisitos: Python 3.12+ e uma chave **gratuita** do Gemini, criada em <https://aistudio.google.com/apikey> (sem cartão, segundo a documentação oficial; detalhes na [D4](#d4-gemini-no-free-tier-com-interface-de-provedor-fina)). Os testes unitários não precisam de chave.
 
 1. Criar e ativar o ambiente virtual, a partir da raiz do repositório:
 
@@ -29,52 +29,56 @@ Requisitos: Python 3.12+ e uma chave de API da Anthropic (só para rodar o agent
    # Linux/macOS:          source .venv/bin/activate
    ```
 
-2. Instalar o projeto com as dependências de desenvolvimento (`anthropic`, `python-dotenv` e `pytest`):
+2. Instalar o projeto com as dependências de desenvolvimento:
 
    ```bash
    pip install -e ".[dev]"
    ```
 
-3. Configurar o `.env` a partir do `.env.example`, que comenta cada variável:
+3. Configurar o `.env` a partir do `.env.example`, que comenta cada variável. Nunca versione o `.env`.
 
    ```bash
    cp .env.example .env
-   # ANTHROPIC_API_KEY=<sua chave>
-   # EMPORIO_MODELO=claude-haiku-5-5
-   # REFERENCE_DATE=2026-03-31
-   # HISTORICO_MAX_TURNOS=10
-   # SALVAR_TRANSCRIPTS=false
+   ```
+
+   ```dotenv
+   EMPORIO_PROVEDOR=gemini
+   GEMINI_API_KEY=<sua-chave>
+   EMPORIO_MODELO=                 # vazio = gemini-3.8-flash
+   ANTHROPIC_API_KEY=              # opcional; só com EMPORIO_PROVEDOR=anthropic
+   REFERENCE_DATE=2026-03-31
+   HISTORICO_MAX_TURNOS=10
+   SALVAR_TRANSCRIPTS=false
+   # EMPORIO_DADOS_DIR=            # opcional; padrão: data/ na raiz do repositório
    ```
 
    `REFERENCE_DATE` é a data que o agente trata como "hoje" (ver [DD1](#suposições-dd1dd9)).
 
-4. Executar a CLI (REPL e modo de mensagem única):
+4. Executar a CLI:
 
-   <!-- TODO: confirmar quando o cli.py existir (entry point planejado: `emporio-agente` / `python -m emporio_agente`) -->
    ```bash
-   # REPL
-   python -m emporio_agente
-   # mensagem única
-   python -m emporio_agente --mensagem "Qual o horário de sábado?"
+   emporio-agente                        # REPL
+   emporio-agente -m "Qual o horário de sábado?"   # mensagem única
+   emporio-agente --mostrar-ferramentas  # mostra as chamadas de ferramenta (argumentos exatos)
+   emporio-agente --debug                # logs de depuração
+   python -m emporio_agente              # equivalente a `emporio-agente`
    ```
-
-   **Pendente:** a CLI ainda não foi implementada.
 
 5. Rodar os testes:
 
    ```bash
-   pytest            # unitários (sem LLM, sem custo); os e2e são pulados se ANTHROPIC_API_KEY não estiver definida
-   pytest -m e2e     # só os cenários e2e (chamam a API e têm custo)
+   pytest            # unitários, sem custo; os e2e são pulados se a chave do provedor configurado não estiver definida
+   pytest -m e2e     # só os cenários e2e (chamam a API do provedor)
    ```
 
 ## Arquitetura
 
-Fluxo de uma mensagem: o loop envia o histórico ao modelo; o modelo decide se chama ferramentas (dados) ou responde direto usando as políticas que já estão no system prompt. O loop executa as ferramentas pedidas, devolve os resultados como dado e repete, até no máximo 5 iterações de ferramenta por turno.
+Fluxo de uma mensagem: o loop envia o histórico ao modelo por uma interface de provedor fina, com os adaptadores **Gemini** (padrão) e **Anthropic** (não validado com chamadas reais, ver [D4](#d4-gemini-no-free-tier-com-interface-de-provedor-fina)); o modelo decide se chama ferramentas (dados) ou responde direto usando as políticas que já estão no system prompt. O loop executa as ferramentas pedidas, devolve os resultados como dado e repete, até no máximo 5 iterações de ferramenta por turno.
 
 ```mermaid
 flowchart TD
   U[Mensagem do cliente] --> L[Loop de function calling<br/>máx. 5 iterações]
-  L --> M[Modelo: Claude Haiku 5.5]
+  L --> M[Modelo<br/>Gemini 3.8 Flash por padrão;<br/>provedor configurável]
   P[System prompt: persona, escopo,<br/>REFERENCE_DATE e politicas.md] --> M
   M -->|pede ferramenta| T[Ferramentas sobre CSV em memória]
   T -->|resultado JSON| L
@@ -125,12 +129,22 @@ Contexto que pesa em todas as decisões: prazo de **2 dias**, dados pequenos (65
 - **Próximo passo, se o manual crescer:** RAG (ou uma ferramenta `consultar_politica`) sobre o Markdown curado. Com um manual de 100+ páginas o prompt inteiro deixa de caber, mas com 8 páginas RAG só adicionaria um ponto de falha.
 - **Descartadas:** ferramenta `consultar_politica(secao)` (uma chamada a mais por pergunta e risco de escolher a seção errada); RAG com embeddings sobre a extração automática (desproporcional para 8 páginas).
 
-### D4. Claude Haiku 5.5, com interface de provedor fina
+### D4. Gemini no free tier, com interface de provedor fina
 
-- **Decisão:** `claude-haiku-5-5` como modelo padrão. Interface de provedor fina desde já, com implementação **só do Anthropic**. Adaptador Gemini é bônus, só se houver folga no fim do dia 2.
-- **Por quê:** é o mais barato verificado com boa qualidade em tool use. Preço verificado em 01/11/2026 em <https://platform.claude.com/docs/en/about-claude/pricing>: **US$ 0,10 por 1M tokens de input e US$ 0,50 por 1M de output** (cache de input: US$ 0,01). A estimativa para desenvolvimento e avaliação (~1.000 turnos, ≈12M de input e 0,6M de output) fica em torno de **US$ 1,5**, menos com cache. Sonnet 5.5 sairia por US$ 12–30 na mesma estimativa.
-- **Contra aceito:** depende de chave paga. O modelo pode subir (Sonnet/Opus) se as evals mostrarem falhas.
-- **Descartadas:** modelo local via Ollama (tool calling mais fraco em pt-BR e o avaliador teria de baixar GBs); só free tier do Gemini (limites não verificados, dados do free tier podem ser usados pelo Google); dois adaptadores desde o início (prazo).
+- **Decisão:** provedor padrão **Gemini** (`EMPORIO_PROVEDOR=gemini`) no free tier do Google AI Studio, modelo `gemini-3.8-flash`. Alternativa documentada: `gemini-3.5-flash-lite`. O modelo pode ser trocado em `EMPORIO_MODELO`; vazio vale o padrão do provedor.
+- **Histórico da decisão:** a escolha original era Claude Haiku 5.5 (US$ 0,10 / US$ 0,50 por 1M tokens de input/output, conferido em 01/11/2026 em <https://platform.claude.com/docs/en/about-claude/pricing>). O Diego mudou para **nenhuma API paga**, e o Gemini virou o padrão.
+- **Por quê:** custo zero para o Diego e para o avaliador, que só precisa criar uma chave gratuita no AI Studio, sem cartão. O Gemini 3.8 Flash é estável e declara suporte a function calling.
+- **SDK:** `google-genai` 2.31.0, publicada em 2026-10-14, a versão estável mais recente com pelo menos 2 semanas de lançamento (<https://pypi.org/project/google-genai/#history>).
+- **Fontes oficiais** (acessadas em 01/11/2026):
+  - Preço: <https://ai.google.dev/gemini-api/docs/pricing> (coluna Free Tier "Free of charge" para o Gemini 3.8 Flash e para o `gemini-3.5-flash-lite`).
+  - Modelo: <https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash> (Stable; "Function calling: Supported").
+  - Chave e cobrança: <https://ai.google.dev/gemini-api/docs/api-key> e <https://ai.google.dev/gemini-api/docs/billing>. Nenhuma exige cartão para o free tier (inferido pela ausência da exigência).
+  - Região e idade: <https://ai.google.dev/gemini-api/docs/available-regions> lista o Brasil; os termos exigem 18 anos ou mais.
+- **Limites de uso:** a documentação (<https://ai.google.dev/gemini-api/docs/rate-limits>) **não publica** RPM, TPM nem RPD do free tier; manda consultar <https://aistudio.google.com/rate-limit>, logado. Os limites valem por projeto, e a cota diária reinicia à meia-noite do horário do Pacífico. Os números de uma conta específica não foram verificados. O adaptador trata o 429 com até 4 tentativas e espera exponencial com jitter, respeitando o `retryDelay`. Com a cota esgotada, o agente mostra uma mensagem própria ("limite de uso atingido") e os contatos humanos.
+- **Aviso sobre dados no free tier:** pelos termos adicionais da API (<https://ai.google.dev/gemini-api/terms>), nos serviços gratuitos o Google pode usar as entradas e as respostas geradas para melhorar seus modelos, e revisores humanos podem lê-las. Isso é aceitável aqui porque **todos os dados são fictícios**. Em produção, com clientes reais, seria preciso o Paid Tier ou outro provedor com DPA, por causa da LGPD.
+- **Adaptador Anthropic:** continua no código (`EMPORIO_PROVEDOR=anthropic`, padrão `claude-haiku-5-5`) com testes simulados, mas **não foi validado com chamadas reais**, porque o Diego optou por não usar API paga.
+- **Contra aceito:** limites do free tier desconhecidos e serviço sujeito a instabilidade (ver [Limitações](#limitações-conhecidas-e-próximos-passos)).
+- **Descartadas:** Claude Haiku 5.5 como padrão (exige API paga); modelo local via Ollama (tool calling mais fraco em pt-BR e o avaliador teria de baixar GBs); dois provedores validados (sem chave paga, só o Gemini é testado de fato).
 
 ### D5. CLI com REPL e modo `--mensagem`
 
@@ -214,7 +228,10 @@ Limitações:
 
 - **Sem RAG:** as políticas cabem inteiras no prompt. Não escala para manuais grandes (ver D3).
 - **Sem persistência entre sessões:** o histórico vive em memória durante a sessão. Num atendimento real o estado ficaria no canal (WhatsApp).
-- **Provedor único:** só Anthropic. O adaptador Gemini é opcional e pode não entrar.
+- **Limites do free tier não verificados:** a documentação não publica RPM/TPM/RPD. Há instabilidade do serviço: 503/504 foram observados no teste de fumaça, e o adaptador repete a chamada (429 e 5xx, até 4 tentativas). No pior caso, um turno pode demorar alguns minutos.
+- **Adaptador Anthropic não validado:** só foi exercitado com testes simulados, nunca com chamadas reais.
+- **Dados enviados ao Google no free tier:** o Google pode usar entradas e saídas para melhorar seus modelos, com possível revisão humana. Aceitável com dados fictícios; inadequado para clientes reais (LGPD).
+- **O agente não conhece a hora do dia, só a data:** não afirma se a loja está aberta agora; informa o horário do dia (T11 em `docs/decisoes.md`). Limitação atual, ponto a ser decidido pelo Diego.
 - **Dados sintéticos com inconsistências:** totais de pedido que não batem, PIX sem desconto, parcelas abaixo do mínimo. O agente usa `orders.total_brl` e não audita pedidos.
 - **Sem data real de entrega nem canal de compra:** o direito de arrependimento (7 dias após o recebimento, só online) depende de perguntar ao cliente.
 - **Sem flag de "venda final":** o §4.4 não é verificável nos dados.
@@ -227,7 +244,8 @@ Próximos passos (com mais tempo):
 
 - RAG ou ferramenta `consultar_politica` se o manual crescer.
 - Persistência de conversas entre sessões (SQLite/JSON).
-- Adaptador Gemini, com free tier para o avaliador rodar sem custo.
+- Validar o adaptador Anthropic com chave paga.
+- Migrar para o Paid Tier (ou outro provedor com DPA) antes de qualquer uso com clientes reais.
 - Rubrica LLM-as-judge em poucos casos, só como relatório.
 - Interface para canal real (API/WhatsApp).
 
@@ -240,7 +258,9 @@ O projeto foi construído com **Claude Code** rodando no **Maestri**, um canvas 
 - **Python:** estrutura do projeto e implementação em TDD.
 - **Docs/QA:** README, documentação e verificação.
 
-**O Diego decide a arquitetura.** Os agentes propõem opções com prós, contras e uma recomendação, e o Diego escolhe. Ele aceitou a maior parte e ajustou alguns pontos: manteve as políticas sem RAG, mas exigiu citação da seção de origem e testes dos fatos críticos; deixou só o adaptador Anthropic, reduziu a avaliação de ~25 para 12–15 cenários e acrescentou a regra de nunca prometer desconto inativo.
+**O Diego decide a arquitetura.** Os agentes propõem opções com prós, contras e uma recomendação, e o Diego escolhe. Ele aceitou a maior parte e ajustou alguns pontos: manteve as políticas sem RAG, mas exigiu citação da seção de origem e testes dos fatos críticos; reduziu a avaliação de ~25 para 12–15 cenários e acrescentou a regra de nunca prometer desconto inativo.
+
+No meio do projeto o Diego mudou o provedor: de Claude Haiku 5.5 para o Gemini no free tier, por exigir custo zero. O adaptador Gemini foi implementado em TDD.
 
 As correções foram registradas no diário, por exemplo: um despacho falhou por erro de escape de caminho Windows; a comparação de extrações do PDF revelou a troca de horários do `pdftotext -layout`; o Orchestrator reverificou de forma independente os exemplos do golden set e o preço do Haiku.
 
