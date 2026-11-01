@@ -190,7 +190,7 @@ def test_provedor_erro_vira_mensagem_amigavel_e_e_logado(cfg, ferr, caplog):
     assert r.falhou is True
     assert "Traceback" not in r.texto and "Anthropic" not in r.texto
     assert "(67) 3321-4500" in r.texto
-    assert any("RateLimitError" in rec.getMessage() or rec.exc_info for rec in caplog.records)
+    assert any("RateLimitError" in rec.getMessage() for rec in caplog.records)
 
 
 def test_turno_com_falha_nao_corrompe_o_historico(cfg, ferr):

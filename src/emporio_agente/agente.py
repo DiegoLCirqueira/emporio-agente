@@ -100,8 +100,8 @@ class Agente:
                     mensagens=[*base, *novas],
                     ferramentas=self._ferramentas.schemas,
                 )
-            except ProvedorErro:
-                log.exception("Falha do provedor; o turno foi descartado")
+            except ProvedorErro as e:
+                log.exception("Falha do provedor, turno descartado: %s", e)
                 return RespostaAgente(MSG_ERRO_TECNICO, tuple(chamadas), uso, falhou=True)
             uso = _somar(uso, r.uso)
 
