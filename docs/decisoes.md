@@ -9,10 +9,25 @@ Decisões do Diego em 2026-11-01 sobre as opções de `docs/opcoes-arquitetura.m
 | D1 | Abordagem | Function calling com loop próprio sobre o SDK do provedor, sem LangChain/LangGraph. Máximo de 5 iterações de ferramenta por turno. |
 | D2 | Dados | Ferramentas específicas por intenção sobre `csv` + `Decimal` em memória (stdlib), com as regras de negócio no código. Ferramentas: `buscar_produtos`, `detalhar_produto`, `consultar_pedido`, `listar_promocoes_ativas` e, opcionalmente, `calcular_pagamento`. Nenhuma ferramenta lista ou busca clientes. |
 | D3 | Políticas | `politicas.md` curado à mão, inteiro no system prompt (com prompt caching), **sem RAG**. Cada trecho cita a seção do PDF de origem (ex.: "§4.1"). Testes automatizados confirmam os fatos críticos: horário de cada dia, prazos de troca, devolução e garantia, regras de parcelamento e desconto PIX. O README registra que a curadoria foi manual (a extração automática troca os horários) e que RAG seria o próximo passo se o manual crescesse. |
-| D4 | Modelo | Claude Haiku 5.5 (`claude-haiku-5-5`). Interface de provedor fina desde já, com implementação **só do Anthropic**. O adaptador Gemini é bônus no fim do dia 2, só se houver folga. |
+| D4 | Modelo | **Gemini no free tier do Google AI Studio** (revisado pelo Diego em 2026-11-01: nenhuma API paga). Detalhes na seção D4 abaixo. |
 | D5 | Interface | CLI: REPL + modo `--mensagem`. Histórico em memória com janela de N turnos. Transcripts `.md` opcionais. |
 | D6 | Guardrails | Prompt (persona do §7, escopo, acessórios) + regras críticas no código: identificação do cliente, resposta genérica em falha, contato mascarado, nenhuma ferramenta de escrita, `REFERENCE_DATE` e escalonamento para humano. |
 | D7 | Avaliação | pytest. Camada 1: testes unitários das ferramentas, sem LLM. Camada 2: **12 a 15 cenários e2e** cobrindo cada ferramenta, políticas, fora do escopo, identificação do cliente e prompt injection. **Vazamento de PII = 0 é gate de entrega.** Sem LLM-as-judge por enquanto. |
+
+### D4 — Modelo e provedor (revisada)
+
+- **Provedor padrão:** Gemini, `EMPORIO_PROVEDOR=gemini`.
+- **Modelo padrão:** `gemini-3.8-flash`. Alternativa documentada: `gemini-3.5-flash-lite`. O modelo pode ser trocado em `EMPORIO_MODELO`; se ficar vazio, vale o padrão do provedor.
+- **SDK:** `google-genai` 2.31.0, publicada em 2026-10-14. É a versão estável mais recente com pelo menos 2 semanas de lançamento (fonte: https://pypi.org/project/google-genai/#history).
+- **Por que o free tier:** custo zero para o Diego e para o avaliador, que só precisa criar uma chave gratuita no AI Studio (https://aistudio.google.com/apikey).
+- **Fontes oficiais** (acessadas em 2026-11-01, verificação do AI Engineer):
+  - **Preço:** https://ai.google.dev/gemini-api/docs/pricing. Para o Gemini 3.8 Flash, a coluna Free Tier traz input e output "Free of charge". O `gemini-3.5-flash-lite` também é "Free of charge".
+  - **Modelo:** https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash. O modelo é Stable, e a página diz "Function calling: Supported".
+  - **Cartão:** nem https://ai.google.dev/gemini-api/docs/api-key nem https://ai.google.dev/gemini-api/docs/billing exigem cartão para o free tier (inferido pela ausência da exigência).
+  - **Região e idade:** https://ai.google.dev/gemini-api/docs/available-regions lista o Brasil. Os termos exigem 18 anos ou mais.
+- **Limites de uso:** a documentação oficial (https://ai.google.dev/gemini-api/docs/rate-limits) não publica RPM, TPM nem RPD do free tier; manda consultar https://aistudio.google.com/rate-limit, logado. Os limites valem por projeto, e a cota diária reinicia à meia-noite do horário do Pacífico. **Os números da conta do Diego não foram verificados.** O adaptador trata o 429 com até 4 tentativas e espera exponencial com jitter, respeitando o `retryDelay`. Com a cota esgotada, o agente mostra uma mensagem própria ("limite de uso atingido") e os contatos humanos.
+- **Uso dos dados no free tier:** pelos Gemini API Additional Terms (https://ai.google.dev/gemini-api/terms), nos serviços gratuitos "Google uses the content you submit to the Services and any generated responses to provide, improve, and develop Google products", e "human reviewers may read, annotate, and process your API input and output". Isso é aceitável aqui porque todos os dados são fictícios. Em produção, com clientes reais, seria preciso usar o Paid Tier (que não usa os dados para treino) ou outro provedor com DPA, por causa da LGPD.
+- **Adaptador Anthropic:** continua no código (`EMPORIO_PROVEDOR=anthropic`, modelo padrão `claude-haiku-5-5`) com testes simulados, mas **NÃO foi validado com chamadas reais**, porque o Diego optou por não usar API paga.
 
 ## Dados
 
@@ -66,6 +81,10 @@ São escolhas de implementação sem impacto de arquitetura, registradas para tr
 | T16 | Tamanho da resposta | `max_tokens` fixo em 1024 por chamada, sem variável de ambiente. |
 | T17 | Rótulos da CLI | "Você:" e "Atendente:", neutros. A persona vem só do prompt. |
 | T18 | Ctrl+C | Ctrl+C no meio de uma resposta encerra a sessão, não só cancela o turno. |
+| T19 | Gemini: API do SDK | `client.models.generate_content` com chamada automática de funções desligada (o loop é nosso, D1). A Interactions API, mais nova, não foi usada porque não segue o contrato de mensagens atual. |
+| T20 | Gemini: raciocínio | `max_output_tokens = max_tokens + 2048` (`MARGEM_RACIOCINIO`), porque no Gemini 3 os tokens de raciocínio contam no limite. `thinking_level` não foi configurado. O adaptador devolve a `thought_signature` de cada chamada no histórico, como o Gemini 3 exige. |
+| T21 | Gemini: erros transitórios | 429 e 5xx são repetidos com espera exponencial (até 4 tentativas, timeout de 60s por requisição). Só o 429 vira `COTA_ESGOTADA`, e um 5xx persistente vira erro técnico genérico. No pior caso, um turno pode demorar alguns minutos com o serviço instável. |
+| T22 | Testes herméticos | O `conftest` não carrega mais o `.env` em `os.environ`, e as variáveis do shell são limpas nos testes unitários. Os e2e leem o `.env` via `Config` e são pulados se faltar a chave do provedor configurado. |
 
 ## Processo
 
