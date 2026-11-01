@@ -9,6 +9,7 @@ from emporio_agente.ferramentas import Ferramentas
 from emporio_agente.politicas import montar_system_prompt
 from emporio_agente.provedores.anthropic import ProvedorAnthropic
 from emporio_agente.provedores.base import (
+    COTA_ESGOTADA,
     Mensagem,
     Provedor,
     ProvedorErro,
@@ -24,6 +25,10 @@ CONTATOS = "WhatsApp (67) 3321-4500, telefone (67) 3341-4444 ou e-mail contato@e
 MSG_ERRO_TECNICO = (
     "Desculpe, tive um problema técnico e não consegui responder agora. "
     f"Pode tentar de novo em instantes? Se preferir, fale com a nossa equipe: {CONTATOS}."
+)
+MSG_COTA = (
+    "No momento o limite de uso do nosso atendimento automático foi atingido. "
+    f"Tente novamente mais tarde, ou fale com a nossa equipe: {CONTATOS}."
 )
 MSG_LIMITE = (
     "Desculpe, não consegui concluir essa consulta por aqui. "
@@ -102,7 +107,8 @@ class Agente:
                 )
             except ProvedorErro as e:
                 log.exception("Falha do provedor, turno descartado: %s", e)
-                return RespostaAgente(MSG_ERRO_TECNICO, tuple(chamadas), uso, falhou=True)
+                texto = MSG_COTA if e.codigo == COTA_ESGOTADA else MSG_ERRO_TECNICO
+                return RespostaAgente(texto, tuple(chamadas), uso, falhou=True)
             uso = _somar(uso, r.uso)
 
             if r.motivo_parada == "ferramenta" and r.chamadas_ferramenta:

@@ -17,6 +17,7 @@ from emporio_agente.config import DADOS_DIR_PADRAO, Config
 from emporio_agente.dados import carregar_dados
 from emporio_agente.ferramentas import Ferramentas
 from emporio_agente.provedores.base import (
+    COTA_ESGOTADA,
     ChamadaFerramenta,
     Mensagem,
     ProvedorErro,
@@ -191,6 +192,22 @@ def test_provedor_erro_vira_mensagem_amigavel_e_e_logado(cfg, ferr, caplog):
     assert "Traceback" not in r.texto and "Anthropic" not in r.texto
     assert "(67) 3321-4500" in r.texto
     assert any("RateLimitError" in rec.getMessage() for rec in caplog.records)
+
+
+def test_cota_esgotada_tem_mensagem_propria(cfg, ferr, caplog):
+    ag, _ = agente(cfg, ferr, ProvedorErro("cota", codigo=COTA_ESGOTADA))
+    with caplog.at_level("ERROR"):
+        r = ag.responder("oi")
+    assert r.falhou is True
+    assert "limite de uso" in r.texto.lower() and "mais tarde" in r.texto.lower()
+    assert "problema técnico" not in r.texto
+    assert "(67) 3321-4500" in r.texto
+    assert ag.historico == ()
+
+
+def test_provedor_erro_generico_continua_com_mensagem_tecnica(cfg, ferr):
+    ag, _ = agente(cfg, ferr, ProvedorErro("outra coisa", codigo="OUTRO"))
+    assert "problema técnico" in ag.responder("oi").texto
 
 
 def test_turno_com_falha_nao_corrompe_o_historico(cfg, ferr):

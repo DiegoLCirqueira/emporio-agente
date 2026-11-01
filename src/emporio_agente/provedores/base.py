@@ -7,8 +7,19 @@ from typing import Any, Literal, Protocol, runtime_checkable
 MotivoParada = Literal["fim_turno", "ferramenta", "max_tokens", "outro"]
 
 
+COTA_ESGOTADA = "COTA_ESGOTADA"
+CHAVE_AUSENTE = "CHAVE_AUSENTE"
+
+
 class ProvedorErro(Exception):
-    """Falha ao falar com o provedor (rede, autenticação, limite, resposta inválida)."""
+    """Falha ao falar com o provedor (rede, autenticação, limite, resposta inválida).
+
+    `codigo` distingue casos que merecem tratamento próprio (COTA_ESGOTADA, CHAVE_AUSENTE).
+    """
+
+    def __init__(self, mensagem: str, codigo: str | None = None):
+        super().__init__(mensagem)
+        self.codigo = codigo
 
 
 @dataclass(frozen=True)
