@@ -145,6 +145,7 @@ def test_sem_chave_explica_o_env_e_sai_com_2(cfg, capsys):
 
 
 def test_erro_de_configuracao_sai_com_2(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("emporio_agente.config.ENV_PADRAO", tmp_path / "sem.env")  # não lê o .env real
     monkeypatch.setenv("REFERENCE_DATE", "31/03/2026")
     codigo = main(["--mensagem", "oi"])
     capturado = capsys.readouterr()
@@ -216,8 +217,8 @@ def test_python_dash_m_sem_chave_sai_com_2(tmp_path):
         capture_output=True,
         text=True,
         encoding="utf-8",
-        env={**ambiente, "ANTHROPIC_API_KEY": ""},
+        env={**ambiente, "EMPORIO_PROVEDOR": "gemini", "EMPORIO_MODELO": "", "GEMINI_API_KEY": "", "ANTHROPIC_API_KEY": ""},
         cwd=tmp_path,
     )
-    assert proc.returncode == 2  # ANTHROPIC_API_KEY vazia no ambiente vence o .env
+    assert proc.returncode == 2  # chave vazia no ambiente vence o .env real (nunca chama a API)
     assert "Traceback" not in proc.stderr

@@ -3,9 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from emporio_agente.config import Config, ConfigError
+from emporio_agente.config import MODELO_PADRAO_POR_PROVEDOR, Config, ConfigError
 
 CHAVES = (
+    "EMPORIO_PROVEDOR",
+    "GEMINI_API_KEY",
     "ANTHROPIC_API_KEY",
     "EMPORIO_MODELO",
     "REFERENCE_DATE",
@@ -29,7 +31,8 @@ def escrever_env(tmp_path, conteudo):
 
 def test_padroes_sem_env(tmp_path):
     cfg = Config.from_env(env_file=tmp_path / "nao_existe.env")
-    assert cfg.modelo == "claude-haiku-5-5"
+    assert cfg.provedor == "gemini"
+    assert cfg.modelo == MODELO_PADRAO_POR_PROVEDOR["gemini"] == "gemini-3.8-flash"
     assert cfg.reference_date == date(2026, 3, 31)
     assert cfg.historico_max_turnos == 10
     assert cfg.salvar_transcripts is False
@@ -104,3 +107,65 @@ def test_config_e_imutavel(tmp_path):
     cfg = Config.from_env(env_file=tmp_path / "x.env")
     with pytest.raises(Exception):
         cfg.modelo = "x"
+
+
+# --- provedor, chaves e modelo padrão --------------------------------------------------
+
+
+def test_modelo_vazio_usa_o_padrao_do_provedor(tmp_path):
+    env = escrever_env(tmp_path, "EMPORIO_PROVEDOR=anthropic\nEMPORIO_MODELO=\n")
+    cfg = Config.from_env(env_file=env)
+    assert cfg.provedor == "anthropic" and cfg.modelo == "claude-haiku-5-5"
+    assert Config.from_env(env_file=escrever_env(tmp_path, "EMPORIO_MODELO=\n")).modelo == "gemini-3.8-flash"
+
+
+def test_modelo_explicito_do_provedor_e_respeitado(tmp_path):
+    env = escrever_env(tmp_path, "EMPORIO_MODELO=gemini-3.8-flash-lite\n")
+    assert Config.from_env(env_file=env).modelo == "gemini-3.8-flash-lite"
+
+
+@pytest.mark.parametrize("provedor", ["Gemini", " ANTHROPIC "])
+def test_provedor_normalizado(tmp_path, provedor):
+    env = escrever_env(tmp_path, f"EMPORIO_PROVEDOR={provedor}\n")
+    assert Config.from_env(env_file=env).provedor == provedor.strip().lower()
+
+
+def test_provedor_invalido(tmp_path):
+    env = escrever_env(tmp_path, "EMPORIO_PROVEDOR=openai\n")
+    with pytest.raises(ConfigError, match="EMPORIO_PROVEDOR"):
+        Config.from_env(env_file=env)
+
+
+def test_modelo_claude_com_provedor_gemini_e_erro_claro(tmp_path):
+    # é exatamente o .env atual do Diego: EMPORIO_MODELO=claude-haiku-5-5 sem EMPORIO_PROVEDOR
+    env = escrever_env(tmp_path, "EMPORIO_MODELO=claude-haiku-5-5\n")
+    with pytest.raises(ConfigError) as info:
+        Config.from_env(env_file=env)
+    msg = str(info.value)
+    assert "EMPORIO_MODELO" in msg and "gemini" in msg and "vazio" in msg
+
+
+def test_modelo_gemini_com_provedor_anthropic_e_erro_claro(tmp_path):
+    env = escrever_env(tmp_path, "EMPORIO_PROVEDOR=anthropic\nEMPORIO_MODELO=gemini-3.8-flash\n")
+    with pytest.raises(ConfigError, match="EMPORIO_MODELO"):
+        Config.from_env(env_file=env)
+
+
+def test_chave_exigida_e_a_do_provedor_escolhido(tmp_path):
+    env = escrever_env(tmp_path, "GEMINI_API_KEY=chave-gemini\nANTHROPIC_API_KEY=chave-claude\n")
+    cfg = Config.from_env(env_file=env)
+    assert cfg.variavel_chave == "GEMINI_API_KEY" and cfg.chave_api == "chave-gemini"
+    env = escrever_env(tmp_path, "EMPORIO_PROVEDOR=anthropic\nANTHROPIC_API_KEY=chave-claude\n")
+    cfg = Config.from_env(env_file=env)
+    assert cfg.variavel_chave == "ANTHROPIC_API_KEY" and cfg.chave_api == "chave-claude"
+
+
+def test_chave_do_outro_provedor_nao_conta(tmp_path):
+    cfg = Config.from_env(env_file=escrever_env(tmp_path, "ANTHROPIC_API_KEY=chave-claude\n"))
+    assert cfg.chave_api is None
+
+
+def test_repr_nao_expoe_chaves(tmp_path):
+    env = escrever_env(tmp_path, "GEMINI_API_KEY=segredo-gemini\nANTHROPIC_API_KEY=segredo-claude\n")
+    texto = repr(Config.from_env(env_file=env))
+    assert "segredo-gemini" not in texto and "segredo-claude" not in texto
