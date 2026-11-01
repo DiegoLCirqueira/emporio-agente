@@ -29,3 +29,6 @@ transcripts/
 Thumbs.db
 .idea/
 .vscode/
+
+# Relatórios locais dos agentes
+.relatorio-*.md
