@@ -45,3 +45,37 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
 
   Tudo bateu. Créditos grátis para contas novas continuam como não verificados.
 - **Status:** aguardando as escolhas do Diego. Nenhuma implementação foi iniciada.
+
+### 2026-11-01 — Decisões do Diego
+
+- **Diego aceitou as recomendações** de abordagem, dados, interface e guardrails.
+- **Diego ajustou o que o agente propôs:**
+  - **Políticas:** sem RAG, mas com citação da seção de origem e testes dos fatos críticos.
+  - **Provedor:** só o Anthropic agora; Gemini vira bônus opcional (o agente havia proposto os dois adaptadores desde o início).
+  - **Avaliação:** de ~25 para 12–15 cenários e2e, sem LLM-as-judge.
+  - **Promoções:** acrescentou que o agente nunca promete desconto inativo, mesmo que o PDF fale de Black Friday.
+- **Diego aceitou as decisões de dados 1 a 7.** Nos itens 8 e 9 ele não se manifestou, e o Orchestrator adotou a recomendação, marcada como revisável em `docs/decisoes.md`.
+- **Diego pediu:**
+  - criar o repositório público no GitHub e fazer push ao fim de cada etapa;
+  - incluir no README uma seção "Tratamento e qualidade dos dados".
+- **Orchestrator:** criou o repositório com `gh repo create` (público) e fez o push dos 6 commits. Registrou as decisões em `docs/decisoes.md`, a fonte de verdade para os agentes.
+
+### 2026-11-01 — Passo 3: estrutura
+
+- **Orchestrator:** despachou em paralelo, em arquivos disjuntos para evitar conflito:
+  - **Python:** pyproject, src/, tests/, `.env.example`, `.gitignore`, `.gitattributes`, venv e teste de fumaça em TDD.
+  - **Docs/QA:** esqueleto do README.
+
+  Os agentes não fazem operações git; o Orchestrator revisa e comita.
+- **Python:**
+  - escreveu o teste de fumaça antes do código e o viu falhar (`AttributeError`) antes de criar `__init__.py`;
+  - validou com um teste temporário que os e2e são pulados quando não há chave de API;
+  - deixou de fora o `readme` do `pyproject.toml` para a instalação não quebrar enquanto o README não existia;
+  - propôs a árvore de módulos para a implementação.
+- **Docs/QA:** escreveu o esqueleto do README com as 9 seções e marcou como pendente tudo o que ainda não existe.
+- **Orchestrator:**
+  - rodou o pytest de forma independente (1 passed);
+  - adicionou `readme` ao `pyproject.toml`;
+  - preencheu "Como rodar" com os comandos reais;
+  - **corrigiu uma imprecisão do README**, que dizia que o Diego "removeu o RAG". O RAG nunca foi a recomendação: o Diego confirmou a decisão sem RAG e acrescentou citações de seção e testes dos fatos.
+- **Pendências de implementação registradas:** o `conftest.py` ainda não lê o `.env`, e falta decidir onde fica o `politicas.md` (package-data ou caminho do repo).
