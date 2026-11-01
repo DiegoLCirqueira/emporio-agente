@@ -32,6 +32,16 @@ ACESSORIOS = {
     "microfone", "suporte", "metronomo", "capotraste", "banqueta", "amplificador",
 }  # fmt: skip
 
+FORMAS_DE_PAGAMENTO = {
+    "pix": "pix",
+    "credito": "credito",
+    "cartao de credito": "credito",
+    "debito": "debito",
+    "cartao de debito": "debito",
+    "boleto": "boleto",
+}
+MAX_PARCELAS = 12
+
 DISPONIBILIDADE = {
     "disponivel": "Disponível",
     "esgotado": "Esgotado no momento",
@@ -206,6 +216,32 @@ SCHEMAS: list[dict] = [
             "ferramenta devolve existe: nunca prometa desconto que ela não listou."
         ),
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "calcular_pagamento",
+        "description": (
+            "Calcula o valor final e as parcelas de uma compra conforme a forma de pagamento: PIX "
+            "(5% de desconto sobre o preço de tabela, que NÃO se soma a promoção), crédito em até 12x "
+            "sem juros (parcela mínima: R$ 50 até 3x, R$ 80 de 4x a 6x, R$ 100 de 7x a 12x), débito e "
+            "boleto (sem desconto). Use quando o cliente perguntar quanto fica no PIX, quanto sai a "
+            "parcela ou em quantas vezes pode pagar. Informe product_id (usa o preço promocional "
+            "quando houver) OU valor, nunca os dois. Não faça essas contas de cabeça."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "forma": {
+                    "type": "string",
+                    "enum": ["pix", "credito", "debito", "boleto"],
+                    "description": "Forma de pagamento.",
+                },
+                "product_id": {"type": "integer", "description": "Produto a calcular (preço atual da loja)."},
+                "valor": {"type": "number", "description": "Valor em reais, quando não for de um produto único."},
+                "parcelas": {"type": "integer", "description": "Número de parcelas (só crédito, de 1 a 12)."},
+            },
+            "required": ["forma"],
+            "additionalProperties": False,
+        },
     },
 ]
 
@@ -483,3 +519,81 @@ class Ferramentas:
                 }
             )
         return {"promocoes": itens, "total": len(itens)}
+
+    # pagamento -----------------------------------------------------------------------
+
+    @staticmethod
+    def _parcela_minima(parcelas: int) -> Decimal:
+        if parcelas <= 3:
+            return Decimal(50)
+        return Decimal(80) if parcelas <= 6 else Decimal(100)
+
+    def _parcela_permitida(self, base: Decimal, parcelas: int) -> bool:
+        return parcelas == 1 or base / parcelas >= self._parcela_minima(parcelas)
+
+    def calcular_pagamento(
+        self,
+        forma: str,
+        valor: Decimal | None = None,
+        product_id: int | None = None,
+        parcelas: int | None = None,
+    ) -> dict:
+        tipo = FORMAS_DE_PAGAMENTO.get(normalizar(forma))
+        if tipo is None:
+            raise ErroFerramenta("ARGUMENTO_INVALIDO", "Forma de pagamento inválida. Use pix, credito, debito ou boleto.")
+        if (valor is None) == (product_id is None):
+            raise ErroFerramenta("ARGUMENTO_INVALIDO", "Informe product_id OU valor (apenas um dos dois).")
+        resposta: dict[str, Any] = {"forma": tipo}
+        observacoes: list[str] = []
+        promocao = None
+        if product_id is not None:
+            produto = self._dados.produto(product_id)
+            if produto is None:
+                raise ErroFerramenta("PRODUTO_NAO_ENCONTRADO", "Não encontrei um produto com esse identificador.")
+            promocao = self._promocao_ativa.get(product_id)
+            base = (
+                self._preco_promocional(produto, promocao.desconto_percent) if promocao else arredondar(produto.preco)
+            )
+            codigo = self._codigo_disponibilidade(produto)
+            resposta["produto"] = {"product_id": product_id, "nome": produto.nome}
+            if codigo != "disponivel":
+                observacoes.append(f"Atenção: o produto está '{DISPONIBILIDADE[codigo]}'.")
+        else:
+            if valor <= 0:
+                raise ErroFerramenta("ARGUMENTO_INVALIDO", "O valor deve ser maior que zero.")
+            base = arredondar(valor)
+        resposta["valor_base"] = formatar_brl(base)
+
+        if tipo != "credito" and parcelas not in (None, 1):
+            raise ErroFerramenta("ARGUMENTO_INVALIDO", "Só o cartão de crédito pode ser parcelado.")
+        final = base
+        if tipo == "pix":
+            if promocao:
+                observacoes.append("O desconto de 5% do PIX não se soma à promoção; vale o preço promocional.")
+            else:
+                desconto = arredondar(base * DESCONTO_PIX)
+                final = base - desconto
+                resposta["desconto_pix"] = formatar_brl(desconto)
+        resposta["valor_final"] = formatar_brl(final)
+
+        n = 1 if parcelas is None else parcelas
+        if not 1 <= n <= MAX_PARCELAS:
+            raise ErroFerramenta("ARGUMENTO_INVALIDO", f"O número de parcelas deve ser de 1 a {MAX_PARCELAS}.")
+        resposta["parcelas"] = n
+        resposta["permitido"] = True
+        if tipo == "credito":
+            parcela = arredondar(base / n)
+            resposta["valor_parcela"] = formatar_brl(parcela)
+            if not self._parcela_permitida(base, n):
+                minimo = self._parcela_minima(n)
+                resposta["permitido"] = False
+                resposta["motivo"] = (
+                    f"Em {n}x a parcela ficaria {formatar_brl(parcela)}, abaixo do mínimo de {formatar_brl(minimo)}."
+                )
+                resposta["max_parcelas_permitidas"] = max(
+                    i for i in range(1, MAX_PARCELAS + 1) if self._parcela_permitida(base, i)
+                )
+            else:
+                observacoes.append("Parcelado sem juros.")
+        resposta["observacoes"] = observacoes
+        return resposta
