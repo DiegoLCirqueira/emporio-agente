@@ -141,3 +141,20 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
   - registrou T12–T18 e revisou T2 em `docs/decisoes.md`, apontando que o filtro era a T2, não a T3 citada no pedido;
   - verificou que não havia chave de API na máquina (nem `.env` nem variável de ambiente) e pediu ao Diego que criasse o `.env`, sem manipular o segredo.
 - **Python:** fez a mudança do filtro em TDD (`cbb5467`), com 3 falhas vistas no vermelho e 5 testes novos (produtos 90 e 121, o inverso com `preco_min`, produto sem promoção e produto só com promoções inativas). A suíte passou para 222 testes. O Orchestrator conferiu à mão que o 90 aparece com teto de R$ 2.000.
+
+### 2026-11-01 — Mudança de provedor: Gemini no free tier
+
+- **Diego decidiu:** nenhuma API paga. O provedor principal passa a ser o Gemini no free tier do Google AI Studio. Isso inverte a D4 (Haiku 5.5 padrão, Gemini como bônus) e antecipa o adaptador Gemini, antes previsto só para o fim do dia 2.
+- **Diego pediu:**
+  - adaptador em TDD com o SDK oficial em versão estável com pelo menos 2 semanas de lançamento;
+  - `EMPORIO_PROVEDOR` com padrão `gemini`;
+  - modelo `gemini-3.8-flash`, confirmado na documentação oficial;
+  - retry com espera exponencial em 429;
+  - registro de que o adaptador Anthropic não foi validado com chamadas reais;
+  - o roteiro de 12 conversas rodado com o Gemini.
+- **Regra de segredos:** nenhuma chave aparece em transcrições, logs, diário, commits ou relatórios. O Orchestrator confirmou só a presença das variáveis no `.env`: `GEMINI_API_KEY` definida, `ANTHROPIC_API_KEY` vazia e `.env` ignorado pelo git. Notou que o `.env` do Diego ainda tem `EMPORIO_MODELO=claude-haiku-5-5` e não tem `EMPORIO_PROVEDOR`.
+- **Orchestrator:** despachou em paralelo:
+  - **Python:** adaptador Gemini, config, retry, `.env.example` e um teste de fumaça real com no máximo 3 requisições;
+  - **AI Engineer:** verificação em fontes oficiais do Google (free tier do modelo, limites RPM/RPD, termos de uso de dados, exigência de cartão).
+
+  O roteiro de 12 conversas fica para depois do adaptador.
