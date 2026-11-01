@@ -79,3 +79,23 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
   - preencheu "Como rodar" com os comandos reais;
   - **corrigiu uma imprecisão do README**, que dizia que o Diego "removeu o RAG". O RAG nunca foi a recomendação: o Diego confirmou a decisão sem RAG e acrescentou citações de seção e testes dos fatos.
 - **Pendências de implementação registradas:** o `conftest.py` ainda não lê o `.env`, e falta decidir onde fica o `politicas.md` (package-data ou caminho do repo).
+
+### 2026-11-01 — Implementação, rodada 1 (itens 1 a 5)
+
+- **Diego decidiu:**
+  - `politicas.md` dentro do pacote, como package data;
+  - o `config.py` lê o `.env`, e os e2e continuam pulados sem chave;
+  - aceitou DD8 e DD9 e pediu que a divergência dos pedidos 3 e 20 seja citada no README.
+- **Diego acrescentou requisitos às ferramentas, cada um com teste:**
+  - busca tolerante a variações de nome ("takamine gd 20");
+  - pergunta ao cliente quando houver ambiguidade;
+  - preços em `Decimal` formatados como R$ 1.234,56;
+  - erros estruturados, nunca exceções cruas;
+  - teste específico de não vazamento de PII.
+- **Diego definiu o ponto de controle:** parar depois da CLI, antes dos e2e, para ele avaliar o agente conversando com ele.
+- **Orchestrator:**
+  - registrou os requisitos como I1–I8 em `docs/decisoes.md` e configurou o package-data no `pyproject.toml`;
+  - despachou em paralelo, em arquivos disjuntos:
+    - **Python:** itens 1, 2, 3 e 5 (config, dados, ferramentas, provedor Anthropic). O Python comita os próprios arquivos com caminhos explícitos, com um commit verde por ciclo TDD que registra o vermelho no corpo, e faz push por item.
+    - **AI Engineer:** item 4 (`politicas.md` curado com citação de seção, `politicas.py` com o system prompt e os testes dos fatos críticos). Os commits do AI Engineer ficam com o Orchestrator.
+- **Decisão de processo do Orchestrator:** cada commit fica verde, com teste e implementação juntos, em vez de um commit separado com o teste falhando. Assim a `main` nunca fica quebrada, e a evidência do vermelho fica no corpo da mensagem.
