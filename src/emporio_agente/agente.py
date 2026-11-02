@@ -1,12 +1,15 @@
 """Agente de atendimento: loop de function calling sobre um Provedor (decisão D1)."""
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from emporio_agente.config import Config
 from emporio_agente.dados import carregar_dados
 from emporio_agente.ferramentas import Ferramentas
-from emporio_agente.politicas import montar_system_prompt
+from emporio_agente.horario import relogio as criar_relogio
+from emporio_agente.politicas import montar_parte_estavel, montar_parte_variavel
 from emporio_agente.provedores.anthropic import ProvedorAnthropic
 from emporio_agente.provedores.gemini import ProvedorGemini
 from emporio_agente.provedores.base import (
@@ -75,11 +78,13 @@ class Agente:
         provedor: Provedor,
         ferramentas: Ferramentas,
         system_prompt: str | None = None,
+        relogio: Callable[[], datetime] | None = None,
     ):
         self._config = config
         self._provedor = provedor
         self._ferramentas = ferramentas
-        self._system = system_prompt if system_prompt is not None else montar_system_prompt(config.reference_date)
+        self._system_fixo = system_prompt
+        self._relogio = relogio or criar_relogio(config.agora_fixo, config.reference_date)
         self._historico: list[Mensagem] = []
 
     @property
@@ -93,16 +98,24 @@ class Agente:
         n = self._config.historico_max_turnos
         return mensagens if len(inicios) <= n else mensagens[inicios[-n] :]
 
+    def _system(self) -> str:
+        """Prompt injetado (testes) ou parte estável + parte variável remontada neste turno (T23)."""
+        if self._system_fixo is not None:
+            return self._system_fixo
+        variavel = montar_parte_variavel(self._config.reference_date, self._relogio())
+        return montar_parte_estavel() + "\n\n" + variavel
+
     def responder(self, mensagem: str) -> RespostaAgente:
         base = self._janela([*self._historico, Mensagem(papel="user", texto=mensagem)])
         novas: list[Mensagem] = []
         chamadas: list[FerramentaChamada] = []
         uso = UsoTokens()
         rodadas = 0
+        system = self._system()  # um relógio por turno: o prompt não muda entre as chamadas do loop
         while True:
             try:
                 r = self._provedor.gerar(
-                    system=self._system,
+                    system=system,
                     mensagens=[*base, *novas],
                     ferramentas=self._ferramentas.schemas,
                 )
@@ -174,5 +187,5 @@ def criar_agente(config: Config | None = None) -> Agente:
     """Monta Config + dados + ferramentas + provedor. Levanta ProvedorErro sem a chave do provedor."""
     config = config or Config.from_env()
     provedor = criar_provedor(config)  # falha cedo sem chave
-    ferramentas = Ferramentas(carregar_dados(config.dados_dir))
+    ferramentas = Ferramentas(carregar_dados(config.dados_dir), data_referencia=config.reference_date)
     return Agente(config, provedor, ferramentas)

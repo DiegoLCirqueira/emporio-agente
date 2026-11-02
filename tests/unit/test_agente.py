@@ -1,7 +1,7 @@
 """Agente com provedor falso roteirizado (sem rede)."""
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -16,6 +16,7 @@ from emporio_agente.agente import (
 from emporio_agente.config import DADOS_DIR_PADRAO, Config
 from emporio_agente.dados import carregar_dados
 from emporio_agente.ferramentas import Ferramentas
+from emporio_agente.horario import FUSO
 from emporio_agente.provedores.base import (
     COTA_ESGOTADA,
     ChamadaFerramenta,
@@ -92,12 +93,52 @@ def test_resposta_direta(cfg, ferr):
 
 
 def test_system_prompt_padrao_vem_das_politicas(cfg, ferr):
-    from emporio_agente.politicas import montar_system_prompt
+    from emporio_agente.politicas import montar_parte_estavel, montar_parte_variavel
 
+    agora = datetime(2026, 3, 31, 10, 0, tzinfo=FUSO)
     prov = ProvedorFalso(texto("ok"))
-    ag = Agente(cfg, prov, ferr)
+    ag = Agente(cfg, prov, ferr, relogio=lambda: agora)
     ag.responder("oi")
-    assert prov.chamadas[0]["system"] == montar_system_prompt(cfg.reference_date)
+    esperado = montar_parte_estavel() + "\n\n" + montar_parte_variavel(cfg.reference_date, agora)
+    assert prov.chamadas[0]["system"] == esperado
+    assert "ABERTA" in esperado
+
+
+def test_parte_variavel_do_prompt_e_remontada_a_cada_turno(cfg, ferr):
+    horas = iter([datetime(2026, 3, 31, 10, 0, tzinfo=FUSO), datetime(2026, 3, 31, 19, 0, tzinfo=FUSO)])
+    prov = ProvedorFalso(texto("a"), texto("b"))
+    ag = Agente(cfg, prov, ferr, relogio=lambda: next(horas))
+    ag.responder("oi")
+    ag.responder("e agora?")
+    s1, s2 = prov.chamadas[0]["system"], prov.chamadas[1]["system"]
+    assert "ABERTA" in s1 and "FECHADA" in s2
+    assert s1.split("# Data de hoje")[0] == s2.split("# Data de hoje")[0]  # parte estável idêntica
+
+
+def test_system_prompt_injetado_nao_e_remontado(cfg, ferr):
+    prov = ProvedorFalso(texto("a"), texto("b"))
+    ag = Agente(cfg, prov, ferr, system_prompt="SYSTEM", relogio=lambda: datetime(2026, 3, 31, 10, tzinfo=FUSO))
+    ag.responder("oi")
+    ag.responder("oi2")
+    assert [c["system"] for c in prov.chamadas] == ["SYSTEM", "SYSTEM"]
+
+
+def test_relogio_padrao_usa_agora_fixo_da_config(tmp_path, ferr):
+    env = tmp_path / ".env"
+    env.write_text("EMPORIO_AGORA=2026-03-31T19:30\n", encoding="utf-8")
+    cfg = Config.from_env(env_file=env)
+    prov = ProvedorFalso(texto("ok"))
+    Agente(cfg, prov, ferr).responder("oi")
+    assert "FECHADA" in prov.chamadas[0]["system"]
+    assert "19:30" in prov.chamadas[0]["system"]
+
+
+def test_criar_agente_passa_data_de_referencia_as_ferramentas(cfg, monkeypatch):
+    from emporio_agente import agente as mod
+
+    monkeypatch.setattr(mod, "criar_provedor", lambda c: ProvedorFalso())
+    ag = mod.criar_agente(cfg)
+    assert ag._ferramentas._referencia == cfg.reference_date
 
 
 def test_ferramenta_e_depois_resposta(cfg, ferr):

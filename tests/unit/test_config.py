@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -11,6 +11,7 @@ CHAVES = (
     "ANTHROPIC_API_KEY",
     "EMPORIO_MODELO",
     "REFERENCE_DATE",
+    "EMPORIO_AGORA",
     "HISTORICO_MAX_TURNOS",
     "SALVAR_TRANSCRIPTS",
     "EMPORIO_DADOS_DIR",
@@ -32,7 +33,8 @@ def escrever_env(tmp_path, conteudo):
 def test_padroes_sem_env(tmp_path):
     cfg = Config.from_env(env_file=tmp_path / "nao_existe.env")
     assert cfg.provedor == "gemini"
-    assert cfg.modelo == MODELO_PADRAO_POR_PROVEDOR["gemini"] == "gemini-3.8-flash"
+    assert cfg.modelo == MODELO_PADRAO_POR_PROVEDOR["gemini"] == "gemini-3.5-flash-lite"
+    assert cfg.agora_fixo is None
     assert cfg.reference_date == date(2026, 3, 31)
     assert cfg.historico_max_turnos == 10
     assert cfg.salvar_transcripts is False
@@ -116,12 +118,12 @@ def test_modelo_vazio_usa_o_padrao_do_provedor(tmp_path):
     env = escrever_env(tmp_path, "EMPORIO_PROVEDOR=anthropic\nEMPORIO_MODELO=\n")
     cfg = Config.from_env(env_file=env)
     assert cfg.provedor == "anthropic" and cfg.modelo == "claude-haiku-5-5"
-    assert Config.from_env(env_file=escrever_env(tmp_path, "EMPORIO_MODELO=\n")).modelo == "gemini-3.8-flash"
+    assert Config.from_env(env_file=escrever_env(tmp_path, "EMPORIO_MODELO=\n")).modelo == "gemini-3.5-flash-lite"
 
 
 def test_modelo_explicito_do_provedor_e_respeitado(tmp_path):
-    env = escrever_env(tmp_path, "EMPORIO_MODELO=gemini-3.8-flash-lite\n")
-    assert Config.from_env(env_file=env).modelo == "gemini-3.8-flash-lite"
+    env = escrever_env(tmp_path, "EMPORIO_MODELO=gemini-3.8-flash\n")
+    assert Config.from_env(env_file=env).modelo == "gemini-3.8-flash"
 
 
 @pytest.mark.parametrize("provedor", ["Gemini", " ANTHROPIC "])
@@ -169,3 +171,16 @@ def test_repr_nao_expoe_chaves(tmp_path):
     env = escrever_env(tmp_path, "GEMINI_API_KEY=segredo-gemini\nANTHROPIC_API_KEY=segredo-claude\n")
     texto = repr(Config.from_env(env_file=env))
     assert "segredo-gemini" not in texto and "segredo-claude" not in texto
+
+
+def test_agora_fixo_interpretado_no_fuso_de_campo_grande(tmp_path):
+    from emporio_agente.horario import FUSO
+
+    cfg = Config.from_env(env_file=escrever_env(tmp_path, "EMPORIO_AGORA=2026-03-31T14:30\n"))
+    assert cfg.agora_fixo == datetime(2026, 3, 31, 14, 30, tzinfo=FUSO)
+
+
+@pytest.mark.parametrize("valor", ["amanha", "2026-03-31", "31/03/2026 14:30", "2026-13-01T10:00", "2026-03-31T25:00"])
+def test_agora_invalido_levanta_config_error(tmp_path, valor):
+    with pytest.raises(ConfigError, match="EMPORIO_AGORA"):
+        Config.from_env(env_file=escrever_env(tmp_path, f"EMPORIO_AGORA={valor}\n"))

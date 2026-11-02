@@ -212,7 +212,34 @@ def test_prompt_e_estavel_mais_variavel_nessa_ordem():
 
 
 def test_parte_variavel_nao_induz_a_dizer_se_esta_aberto_agora():
-    # O agente só conhece a data, não a hora: não pode afirmar "estamos abertos agora".
     v = montar_parte_variavel(REF)
-    assert "para saber se a loja está aberta" not in v
-    assert "hora atual" in v
+    assert "Você não sabe a hora" not in v
+    assert re.search(r"[Nn]unca afirme que a loja está aberta ou fechada além do fato informado", v)
+
+
+def test_parte_variavel_com_relogio_traz_o_fato_pronto():
+    from datetime import datetime
+
+    from emporio_agente.horario import FUSO, texto_para_prompt
+
+    agora = datetime(2026, 3, 31, 19, 0, tzinfo=FUSO)
+    v = montar_parte_variavel(REF, agora)
+    assert texto_para_prompt(agora) in v
+    assert "FECHADA" in v
+    assert montar_system_prompt(REF, agora) == montar_parte_estavel() + "\n\n" + v
+
+
+def test_prompt_regra_previsao_vencida_caso6(prompt):
+    assert "previsao_vencida" in prompt
+    assert re.search(r"exatamente como a ferramenta retornar", prompt)
+    assert re.search(r"sem deduzir (a )?entrega", prompt)
+
+
+def test_prompt_regra_promocao_caso7(prompt):
+    assert re.search(r"(pergunta|pergunt\w+) sobre promoção, desconto ou Black Friday.*listar_promocoes_ativas.*ANTES de responder", prompt, re.S)
+    assert re.search(r"datas comemorativas", prompt)
+    assert re.search(r"nunca prometa desconto inativo", prompt, re.I)
+
+
+def test_prompt_regra_mais_resultados_caso1(prompt):
+    assert "nao_exibidos" in prompt

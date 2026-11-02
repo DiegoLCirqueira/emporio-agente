@@ -2,10 +2,12 @@
 
 import os
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from dotenv import dotenv_values
+
+from emporio_agente.horario import FUSO
 
 RAIZ_REPO = Path(__file__).resolve().parents[2]
 ENV_PADRAO = RAIZ_REPO / ".env"
@@ -14,7 +16,8 @@ DADOS_DIR_PADRAO = RAIZ_REPO / "data"
 PROVEDORES = ("gemini", "anthropic")
 PROVEDOR_PADRAO = "gemini"
 # Modelo usado quando EMPORIO_MODELO está vazio. Fácil de trocar aqui.
-MODELO_PADRAO_POR_PROVEDOR = {"gemini": "gemini-3.8-flash", "anthropic": "claude-haiku-5-5"}
+# gemini-3.8-flash é a alternativa documentada (D4): indisponível no free tier (503/504).
+MODELO_PADRAO_POR_PROVEDOR = {"gemini": "gemini-3.5-flash-lite", "anthropic": "claude-haiku-5-5"}
 VARIAVEL_CHAVE_POR_PROVEDOR = {"gemini": "GEMINI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
 PREFIXO_MODELO_POR_PROVEDOR = {"gemini": "gemini", "anthropic": "claude"}
 REFERENCE_DATE_PADRAO = "2026-03-31"
@@ -38,6 +41,8 @@ class Config:
     dados_dir: Path
     provedor: str = PROVEDOR_PADRAO
     gemini_api_key: str | None = field(default=None, repr=False)
+    # Instante fixo ("agora") em America/Campo_Grande, para testes e demonstrações (T23).
+    agora_fixo: datetime | None = None
 
     @property
     def variavel_chave(self) -> str:
@@ -81,6 +86,7 @@ class Config:
             ),
             salvar_transcripts=_booleano("SALVAR_TRANSCRIPTS", obter("SALVAR_TRANSCRIPTS", "false")),
             anthropic_api_key=obter("ANTHROPIC_API_KEY") or None,
+            agora_fixo=_agora("EMPORIO_AGORA", obter("EMPORIO_AGORA")),
             dados_dir=Path(obter("EMPORIO_DADOS_DIR") or DADOS_DIR_PADRAO),
         )
 
@@ -100,6 +106,17 @@ def _data(chave: str, texto: str) -> date:
         return date.fromisoformat(texto)
     except ValueError:
         raise ConfigError(f"{chave} inválida: {texto!r}. Use o formato AAAA-MM-DD.") from None
+
+
+def _agora(chave: str, texto: str) -> datetime | None:
+    if not texto:
+        return None
+    try:
+        if len(texto) != len("AAAA-MM-DDTHH:MM"):
+            raise ValueError
+        return datetime.fromisoformat(texto).replace(tzinfo=FUSO)
+    except ValueError:
+        raise ConfigError(f"{chave} inválida: {texto!r}. Use o formato AAAA-MM-DDTHH:MM.") from None
 
 
 def _inteiro_positivo(chave: str, texto: str) -> int:

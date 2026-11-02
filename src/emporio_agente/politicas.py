@@ -6,14 +6,17 @@ O system prompt tem duas partes, nesta ordem:
    byte-idêntica entre turnos e conversas, então é a candidata ao prompt caching. No
    Anthropic, envie-a como o primeiro bloco de `system` com
    `cache_control={"type": "ephemeral"}`.
-2. **Parte variável** (`montar_parte_variavel`): a data de referência ("hoje"). Fica
+2. **Parte variável** (`montar_parte_variavel`): a data de referência ("hoje") e, quando há
+   relógio, o fato "loja aberta/fechada agora" (T23), remontado a cada turno. Fica
    depois do ponto de cache, para que mudar a data não invalide o prefixo em cache.
 
 `montar_system_prompt` concatena as duas em uma string, para provedores sem blocos.
 """
-from datetime import date
+from datetime import date, datetime
 from functools import cache
 from importlib.resources import files
+
+from emporio_agente.horario import texto_para_prompt
 
 _DIAS_SEMANA = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
                 "sexta-feira", "sábado", "domingo"]
@@ -37,9 +40,12 @@ Você é o assistente virtual da Empório da Música, loja de instrumentos music
 - Para políticas (horários, endereço, pagamento, parcelamento, frete, trocas, devoluções, garantia, privacidade), use o manual de políticas abaixo, e só ele.
 - Produto indisponível ou descontinuado: siga o §7.3 e sugira alternativas disponíveis consultando as ferramentas. Produto "em breve" ainda não está à venda.
 - Se a busca retornar mais de um produto provável para o que o cliente pediu, pergunte qual deles ele quer antes de detalhar preço ou estoque.
+- Pedido: informe o status exatamente como a ferramenta retornar, sem deduzir entrega. Se vier previsao_vencida: true, diga que a previsão informada já passou e que o status continua o registrado; ofereça encaminhar para a equipe humana.
+- Se buscar_produtos trouxer nao_exibidos maior que zero, avise o cliente que há mais opções além das mostradas e ofereça refinar (marca, modelo ou faixa de preço).
 - Ao mostrar uma promoção, informe o preço original, o percentual de desconto e o preço final (§6.2).
 
 # Promoções (regra obrigatória)
+- Qualquer pergunta sobre promoção, desconto ou Black Friday (ou outra campanha) exige chamar listar_promocoes_ativas ANTES de responder. Você pode citar o que as políticas dizem sobre datas comemorativas (§6.1), mas nunca prometa desconto inativo.
 - Só vale desconto que a ferramenta retornar como ativo. Nunca prometa desconto que não esteja ativo no sistema, mesmo que o cliente cite Black Friday, Aniversário da Loja, Semana do Músico ou qualquer campanha do manual. O calendário do §6.1 é só referência histórica.
 - O desconto de PIX (5%) não se soma a preço promocional.
 
@@ -79,14 +85,17 @@ def montar_parte_estavel() -> str:
     return f"{_INSTRUCOES}<manual_de_politicas>\n{manual}\n</manual_de_politicas>"
 
 
-def montar_parte_variavel(reference_date: date) -> str:
-    """Data de referência ("hoje"). Fica fora do bloco em cache."""
+def montar_parte_variavel(reference_date: date, agora: datetime | None = None) -> str:
+    """Data de referência ("hoje") e, se houver `agora`, o fato aberta/fechada. Fora do cache."""
     dia = _DIAS_SEMANA[reference_date.weekday()]
-    return (f"# Data de hoje\nHoje é {dia}, {reference_date:%d/%m/%Y} "
-            f"({reference_date.isoformat()}). Use esta data para prazos. "
-            "Você não sabe a hora atual: se perguntarem se a loja está aberta agora, informe o horário do dia.")
+    texto = (f"# Data de hoje\nHoje é {dia}, {reference_date:%d/%m/%Y} "
+             f"({reference_date.isoformat()}). Use esta data para prazos. "
+             "Nunca afirme que a loja está aberta ou fechada além do fato informado.")
+    if agora is not None:
+        texto += "\n" + texto_para_prompt(agora)
+    return texto
 
 
-def montar_system_prompt(reference_date: date) -> str:
+def montar_system_prompt(reference_date: date, agora: datetime | None = None) -> str:
     """System prompt completo como string única (parte estável + parte variável)."""
-    return montar_parte_estavel() + "\n\n" + montar_parte_variavel(reference_date)
+    return montar_parte_estavel() + "\n\n" + montar_parte_variavel(reference_date, agora)
