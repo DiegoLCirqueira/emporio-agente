@@ -2,6 +2,7 @@
 
 import json
 import re
+from datetime import date
 
 import pytest
 
@@ -245,3 +246,45 @@ def test_nenhuma_ferramenta_lista_ou_busca_clientes(ferr):
         assert "cliente" not in s["name"] and "customer" not in texto
     r = ferr.executar("listar_clientes", {})
     assert r["erro"]["codigo"] == "FERRAMENTA_DESCONHECIDA"
+
+
+# --- previsão vencida (caso 6) -------------------------------------------------------------
+
+
+def consultar_com_ref(dados, order_id, ident, ref):
+    return Ferramentas(dados, data_referencia=ref).executar(
+        "consultar_pedido", {"order_id": order_id, "telefone_ou_email": ident}
+    )
+
+
+def test_pedido_enviado_com_previsao_anterior_a_referencia_vem_vencido(dados):
+    r = consultar_com_ref(dados, 8, TEL_8, date(2026, 3, 31))
+    p = r["pedido"]
+    assert p["status"]["codigo"] == "shipped"
+    assert p["previsao_entrega"] == "28/02/2026"
+    assert p["previsao_vencida"] is True
+    assert "não deduza" in p["orientacao_previsao"].lower()
+    assert "entreg" in p["orientacao_previsao"].lower()
+
+
+def test_previsao_no_prazo_nao_marca_vencida(dados):
+    r = consultar_com_ref(dados, 8, TEL_8, date(2026, 2, 20))
+    assert "previsao_vencida" not in r["pedido"]
+    assert "orientacao_previsao" not in r["pedido"]
+
+
+def test_previsao_no_proprio_dia_nao_e_vencida(dados):
+    r = consultar_com_ref(dados, 8, TEL_8, date(2026, 2, 28))
+    assert "previsao_vencida" not in r["pedido"]
+
+
+def test_sem_data_de_referencia_nao_marca_vencida(ferr):
+    assert "previsao_vencida" not in consultar(ferr, 8, TEL_8)["pedido"]
+
+
+def test_entregue_e_cancelado_nunca_vencem(dados):
+    for p in dados.pedidos:
+        if p.status in ("delivered", "cancelled") and p.estimated_delivery:
+            cliente = dados._clientes_por_id[p.customer_id]
+            r = consultar_com_ref(dados, p.order_id, cliente.email, date(2030, 1, 1))
+            assert "previsao_vencida" not in r["pedido"], p.order_id

@@ -8,6 +8,7 @@ import difflib
 import logging
 import re
 import unicodedata
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
@@ -176,7 +177,7 @@ SCHEMAS: list[dict] = [
         "name": "buscar_produtos",
         "description": (
             "Busca produtos no catálogo da loja por texto livre (nome, marca, modelo, tipo), "
-            "categoria e/ou faixa de preço. Use SEMPRE que o cliente perguntar se a loja tem "
+            "categoria e/ou faixa de preço. Com faixa de preço, ordena do mais barato ao mais caro e informa total e nao_exibidos: avise o cliente quando houver mais opções. Use SEMPRE que o cliente perguntar se a loja tem "
             "um produto, quiser opções, preços ou disponibilidade. Tolera acentos, maiúsculas e "
             "variações como 'gd 20' ou 'gd20'. Se a resposta vier com 'ambiguo': true, pergunte "
             "ao cliente qual dos 'candidatos' ele quer antes de afirmar preço ou estoque. Se vier "
@@ -226,7 +227,7 @@ SCHEMAS: list[dict] = [
         "name": "consultar_pedido",
         "description": (
             "Consulta o status de UM pedido (situação, itens, total, forma de pagamento, rastreio e "
-            "previsão de entrega). Só funciona com o número do pedido E o telefone OU o e-mail "
+            "previsão de entrega). Informe o status exatamente como retornar; se vier previsao_vencida: true, o status continua o registrado, não deduza entrega. Só funciona com o número do pedido E o telefone OU o e-mail "
             "cadastrado do titular: peça os dois ao cliente antes de chamar. Se a ferramenta "
             "responder PEDIDO_OU_IDENTIFICACAO_INVALIDOS, diga apenas que não foi possível localizar "
             "o pedido com esses dados, sem indicar qual deles está errado e sem dar dicas. "
@@ -249,8 +250,9 @@ SCHEMAS: list[dict] = [
         "name": "listar_promocoes_ativas",
         "description": (
             "Lista as promoções que estão valendo agora, com preço de tabela e preço promocional. "
-            "Use quando o cliente perguntar por promoções, ofertas ou descontos. Só o que esta "
-            "ferramenta devolve existe: nunca prometa desconto que ela não listou."
+            "Chame ANTES de responder a QUALQUER pergunta sobre promoção, oferta, desconto ou Black Friday (e outras campanhas). "
+            "Só o que esta ferramenta devolve existe: nunca prometa desconto que ela não listou; "
+            "pode citar o que as políticas dizem de datas comemorativas."
         ),
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
@@ -287,8 +289,9 @@ SCHEMAS: list[dict] = [
 
 
 class Ferramentas:
-    def __init__(self, dados: Dados):
+    def __init__(self, dados: Dados, data_referencia: date | None = None):
         self._dados = dados
+        self._referencia = data_referencia
         self._promocao_ativa = {}
         for promo in dados.promocoes:
             if promo.ativa:
@@ -485,9 +488,13 @@ class Ferramentas:
             base = [p for p in base if self._preco_final(p) >= preco_min]
         if preco_max is not None:
             base = [p for p in base if self._preco_final(p) <= preco_max]
+        faixa_de_preco = preco_min is not None or preco_max is not None
 
         disponiveis = [p for p in base if self._codigo_disponibilidade(p) == "disponivel"]
         selecionados = disponiveis if so_disponiveis else base
+
+        if faixa_de_preco:
+            selecionados = sorted(selecionados, key=lambda p: (self._preco_final(p), p.product_id))
 
         if texto and nivel == 3 and 2 <= len(selecionados) <= LIMITE_AMBIGUIDADE:
             return {
@@ -503,10 +510,12 @@ class Ferramentas:
             ambiguo=False,
             produtos=[self._visao(p) for p in selecionados[:LIMITE_RESULTADOS]],
             total=len(selecionados),
+            nao_exibidos=max(len(selecionados) - LIMITE_RESULTADOS, 0),
         )
         if len(selecionados) > LIMITE_RESULTADOS:
             resposta["aviso"] = (
-                f"Mostrando {LIMITE_RESULTADOS} de {len(selecionados)}. Refine a busca (marca, modelo ou faixa de preço) para ver outros."
+                f"Mostrando {LIMITE_RESULTADOS} de {len(selecionados)}. Informe ao cliente que há mais opções "
+                "e sugira refinar a busca (marca, modelo ou faixa de preço) para ver outros."
             )
         if so_disponiveis and not selecionados and base:
             resposta["produtos_indisponiveis"] = [self._visao(p) for p in base[:LIMITE_RESULTADOS]]
@@ -671,6 +680,17 @@ class Ferramentas:
             saida["rastreio"] = pedido.tracking_code
         if pedido.estimated_delivery:
             saida["previsao_entrega"] = pedido.estimated_delivery.strftime("%d/%m/%Y")
+        if (
+            self._referencia is not None
+            and pedido.estimated_delivery
+            and pedido.estimated_delivery < self._referencia
+            and pedido.status not in ("delivered", "cancelled")
+        ):
+            saida["previsao_vencida"] = True
+            saida["orientacao_previsao"] = (
+                "A previsão de entrega já passou, mas o status continua o registrado: "
+                "não deduza que o pedido foi entregue."
+            )
         if pedido.status == "cancelled" and pedido.notes:
             saida["observacoes"] = pedido.notes
         return {

@@ -310,3 +310,54 @@ def test_schemas_neutros_de_provedor(ferr):
         assert set(s) == {"name", "description", "input_schema"}
         assert s["input_schema"]["type"] == "object"
         assert len(s["description"]) > 40
+
+
+# --- ordenação por preço e totais (caso 1) -------------------------------------------------
+
+
+def _final(ferr, product_id):
+    return ferr._preco_final(ferr._dados.produto(product_id))
+
+
+def test_faixa_de_preco_ordena_do_mais_barato_ao_mais_caro(ferr):
+    r = ferr.executar("buscar_produtos", {"categoria": "Violões", "preco_max": 1000})
+    precos = [_final(ferr, i) for i in ids(r)]
+    assert precos == sorted(precos)
+    assert r["total"] >= len(r["produtos"])
+
+
+def test_violoes_ate_1000_nenhum_mais_barato_fica_de_fora(ferr):
+    r = ferr.executar("buscar_produtos", {"texto": "violões", "preco_max": 1000})
+    assert r["ok"] is True
+    todos = [
+        p for p in ferr._dados.produtos
+        if p.category_id in ferr._categorias_da_consulta("violões")
+        and ferr._codigo_disponibilidade(p) == "disponivel"
+        and ferr._preco_final(p) <= 1000
+    ]
+    esperado = sorted(todos, key=lambda p: (ferr._preco_final(p), p.product_id))
+    assert r["total"] == len(esperado)
+    mostrados = ids(r)
+    assert mostrados == [p.product_id for p in esperado][: len(mostrados)]
+    assert r["nao_exibidos"] == len(esperado) - len(mostrados)
+
+
+def test_nao_exibidos_e_aviso_quando_ha_mais_que_o_limite(ferr):
+    r = ferr.executar("buscar_produtos", {"preco_min": 1})
+    assert r["total"] > len(r["produtos"]) == 10
+    assert r["nao_exibidos"] == r["total"] - 10
+    assert "informe" in r["aviso"].lower()
+    precos = [_final(ferr, i) for i in ids(r)]
+    assert precos == sorted(precos)
+
+
+def test_nao_exibidos_zero_quando_cabe_tudo(ferr):
+    r = ferr.executar("buscar_produtos", {"categoria": "ukulele", "preco_max": 200})
+    assert r["nao_exibidos"] == 0
+    assert "aviso" not in r
+
+
+def test_descricao_de_promocoes_manda_chamar_antes_de_responder(ferr):
+    desc = next(s for s in ferr.schemas if s["name"] == "listar_promocoes_ativas")["description"]
+    assert "ANTES de responder" in desc
+    assert "Black Friday" in desc
