@@ -183,3 +183,15 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
     - "tem promoções ativas" foi afirmado sem chamar a ferramenta;
     - "palheta" foi resolvida pela política, sem ferramenta, o que é discutível contra o critério.
   - Nada foi corrigido, conforme o Diego pediu.
+
+### 2026-11-02 — Passo 1 da correção: hora, previsão vencida, ordenação e promoção
+
+- **Diego decidiu (T23):** a hora vem do código, não do modelo (opção B): data de referência + hora do relógio no fuso de Campo Grande, com `EMPORIO_AGORA` para fixar o instante. Também fixou o Flash-Lite como modelo padrão e o `gemini-3.8-flash` como alternativa documentada.
+- **Python (em TDD, vermelho antes do verde):**
+  - 27 testes novos falharam antes da implementação (config, agente, política, pedido e busca) e a suíte unitária fechou em **310 passed** (os 18 e2e não foram rodados, para não gastar cota da API);
+  - `Config.agora_fixo` (`EMPORIO_AGORA`), `Agente` com relógio e parte variável do prompt remontada a cada turno (T23);
+  - `previsao_vencida` em `consultar_pedido` (T24, caso 6), ordenação por preço final com `total` e `nao_exibidos` (T25, caso 1) e regra de promoção no prompt e na ferramenta (T26, caso 7);
+  - `tzdata>=2026.1` nas dependências e marker e2e genérico no `pyproject.toml`.
+- **Registro:** T23 a T27 e a revisão da D4 em `docs/decisoes.md` (T10 e T11 marcadas como revisadas). O critério da pergunta 8 ("palheta") foi aceito como cumprido pela política, sem ferramenta (T27).
+- **Estado atual:** os 3 casos do roteiro com ❌ ou ⚠️ têm correção em código e teste unitário, mas **ainda não foram reexecutados com o modelo real**. O README ainda cita `gemini-3.8-flash` como padrão (linhas 47, 134 e 140) e precisa ser alinhado pelo Docs/QA.
+- **Próximo passo:** o Orchestrator comita; depois reexecutar com o Flash-Lite as conversas dos casos 1, 6, 7 e a da hora (agora com `EMPORIO_AGORA`), e atualizar o README.
