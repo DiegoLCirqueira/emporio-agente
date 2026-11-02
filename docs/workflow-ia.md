@@ -216,3 +216,10 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
 - **Registro:** T28 (revoga a divergência 550,90 × 550,91) e T29 em `docs/decisoes.md`; resumo dos prazos (§4.2, §8.1) em `politicas.md`.
 - **Estado atual:** código e testes unitários prontos, sem commit. README e `tests/e2e/` não foram tocados.
 - **Próximo passo:** o Orchestrator comita; depois rodar a regressão e os e2e com o modelo real e alinhar o README.
+
+### 2026-11-02 — Retomada de sessão e fechamento do README
+
+- **Retomada:** a sessão foi retomada com "continue de onde parou". O Orchestrator reconstruiu o estado pelo repositório, pelo `git log` e por este diário. Decisão de processo: o diário passa a ser atualizado ao fim de cada passo, para permitir retomadas.
+- **Avaliação e2e (modelo `gemini-3.5-flash-lite`):** 3 rodadas completas (11/15, 14/15 e 14/15), sem falhas por 503, 504 ou 429 e com 0 vazamentos de PII. Os cenários instáveis foram o 04 e o 13. Depois do ajuste final dos critérios e da fórmula do 13 não houve nova rodada completa, só repetições dos cenários afetados.
+- **Docs/QA:** README final com os resultados e2e, a lista das 4 conversas de exemplo e as limitações novas (ordem válida → inválida na identificação). Suíte unitária: 382 passed.
+
