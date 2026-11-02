@@ -12,6 +12,7 @@ dependencies = [
     "anthropic>=2.3.0",
     "python-dotenv>=1.2.4",
     "google-genai>=2.31.0",
+    "tzdata>=2026.1",
 ]
 
 [project.optional-dependencies]
@@ -33,5 +34,5 @@ emporio_agente = ["politicas.md"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
-    "e2e: testes de ponta a ponta que chamam a API da Anthropic (pulados sem ANTHROPIC_API_KEY)",
+    "e2e: testes de ponta a ponta que chamam a API do provedor configurado (pulados sem a chave dele)",
 ]
