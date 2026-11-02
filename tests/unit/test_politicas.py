@@ -263,3 +263,10 @@ def test_prompt_regra_nao_mencionar_campanhas_futuras(prompt):
     assert re.search(r"[Nn]ão mencione descontos ou datas de campanhas futuras", prompt)
     assert re.search(r"não há promoção dessa campanha ativa", prompt)
     assert re.search(r"liste o que a ferramenta devolveu", prompt)
+
+
+def test_prompt_formula_obrigatoria_de_defeito_com_30_e_90(prompt):
+    assert "troca por defeito em até 30 dias da compra (§4.2)" in prompt
+    assert "garantia legal de 90 dias a partir do recebimento (§8.1)" in prompt
+    assert re.search(r"defeito, quebra ou problema de funcionamento.*em qualquer prazo.*DEVE conter as DUAS frases", prompt, re.S)
+    assert re.search(r"DUAS frases.*troca por defeito em até 30 dias.*garantia legal de 90 dias.*31º e o 90º dia.*equipe", prompt, re.S)
