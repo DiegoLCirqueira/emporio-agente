@@ -195,3 +195,16 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
 - **Registro:** T23 a T27 e a revisão da D4 em `docs/decisoes.md` (T10 e T11 marcadas como revisadas). O critério da pergunta 8 ("palheta") foi aceito como cumprido pela política, sem ferramenta (T27).
 - **Estado atual:** os 3 casos do roteiro com ❌ ou ⚠️ têm correção em código e teste unitário, mas **ainda não foram reexecutados com o modelo real**. O README ainda cita `gemini-3.8-flash` como padrão (linhas 47, 134 e 140) e precisa ser alinhado pelo Docs/QA.
 - **Próximo passo:** o Orchestrator comita; depois reexecutar com o Flash-Lite as conversas dos casos 1, 6, 7 e a da hora (agora com `EMPORIO_AGORA`), e atualizar o README.
+
+### 2026-11-02 — Passos 2 e 3: regressão e cenários e2e com o modelo real
+
+- **Orchestrator:** commitou o Passo 1 em 4 commits e ajustou o `.env` local do Diego (provedor `gemini`, modelo `gemini-3.5-flash-lite`; estava com o modelo Anthropic). Despachou ao Docs/QA só os ajustes do README (modelo, latência, hora, status dos casos-limite) e ao AI Engineer a regressão e os cenários e2e.
+- **AI Engineer, Passo 2 (regressão, Flash-Lite real):** perguntas 1, 6, 7 e 12 ✅ (4 de 4), sem vazamento de PII. Na pergunta 6, com telefone inexistente no CSV, o modelo respondeu o texto genérico sem chamar a ferramenta (nada vazou). Dois turnos levaram ~50 a 57 s; os demais, 1 a 10 s.
+- **AI Engineer, Passo 3 (15 cenários e2e, `tests/e2e/`):** **11 passaram, 4 falharam, 0 por instabilidade do serviço**. **PII: zero vazamentos** e zero ecos do cliente. O cenário 07 foi confirmado nas chamadas: `consultar_pedido` com identificação errada devolveu `PEDIDO_OU_IDENTIFICACAO_INVALIDOS`.
+- **Falhas:**
+  - 04 (promoção): defeito leve do prompt. A resposta listou as 4 promoções certas, mas disse que "a Black Friday e seus descontos maiores ficam para novembro". Não é determinístico (na pergunta 7 do Passo 2 saiu correto).
+  - 05 (pedido certo): critério do teste frágil. O cliente só perguntou o status e a resposta correta não citou o total.
+  - 08 (PIX): achado real. `calcular_pagamento` dá R$ 550,90 (arredonda o desconto antes) e `buscar_produtos` dá R$ 550,91 (arredonda o preço final). O mesmo produto tem dois valores de PIX.
+  - 13 (garantia): a resposta cita o 31º e o 90º dia, mas não diz os prazos de 30 e 90 dias em números; o regex do teste também não casava "90º".
+- **Estado atual:** código e testes unitários em 310 verdes; e2e escritos e commitados com os 4 ❌ documentados acima, nada corrigido (o Diego pediu parar no relatório).
+- **Próximo passo (a decidir pelo Diego):** (1) regra de arredondamento do PIX; (2) reforço no prompt para não mencionar descontos de campanhas futuras e para citar os prazos de 30/90 dias; (3) ajustar os critérios dos cenários 05 e 13 e rerodar 04, 05, 08 e 13; depois, as conversas de exemplo em `conversas/` e o README final.
