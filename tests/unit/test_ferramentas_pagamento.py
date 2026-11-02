@@ -2,7 +2,7 @@ import pytest
 
 from emporio_agente.config import DADOS_DIR_PADRAO
 from emporio_agente.dados import carregar_dados
-from emporio_agente.ferramentas import Ferramentas
+from emporio_agente.ferramentas import Ferramentas, formatar_brl
 
 
 @pytest.fixture(scope="module")
@@ -133,3 +133,44 @@ def test_produto_inexistente(ferr):
 
 def test_valor_em_formato_brasileiro(ferr):
     assert calc(ferr, valor="1.299,90", forma="boleto")["valor_final"] == "R$ 1.299,90"
+
+
+# --- PIX: uma única função de preço (T28) --------------------------------------------------
+
+from decimal import Decimal  # noqa: E402
+
+from emporio_agente.config import DADOS_DIR_PADRAO as _DIR  # noqa: E402
+from emporio_agente.ferramentas import preco_pix  # noqa: E402
+
+_PRODUTOS = carregar_dados(_DIR).produtos
+
+
+@pytest.mark.parametrize(
+    "preco, desconto, final",
+    [
+        ("579.90", "29.00", "550.90"),  # 28,995 sobe para 29,00 (ROUND_HALF_UP)
+        ("2199.00", "109.95", "2089.05"),
+        ("1000.00", "50.00", "950.00"),
+    ],
+)
+def test_preco_pix_arredonda_o_desconto_e_subtrai(preco, desconto, final):
+    assert preco_pix(Decimal(preco)) == (Decimal(desconto), Decimal(final))
+
+
+@pytest.mark.parametrize("produto", _PRODUTOS, ids=lambda p: str(p.product_id))
+def test_todas_as_ferramentas_dao_o_mesmo_preco_pix(ferr, produto):
+    pid = produto.product_id
+    calc_pix = calc(ferr, forma="pix", product_id=pid)
+    detalhe = ferr.executar("detalhar_produto", {"product_id": pid})["produto"]
+    busca = ferr.executar("buscar_produtos", {"texto": produto.nome, "so_disponiveis": False})
+    visoes = [p for p in busca.get("produtos", []) + busca.get("candidatos", []) if p["product_id"] == pid]
+    assert visoes, "produto não apareceu na busca pelo próprio nome"
+    if "preco_promocional" in detalhe:  # PIX não soma com promoção
+        assert "preco_pix" not in detalhe and all("preco_pix" not in v for v in visoes)
+        assert calc_pix["valor_final"] == detalhe["preco_promocional"]
+        return
+    esperado = formatar_brl(preco_pix(produto.preco)[1])
+    assert detalhe["preco_pix"] == esperado
+    assert all(v["preco_pix"] == esperado for v in visoes)
+    assert calc_pix["valor_final"] == esperado
+    assert calc_pix["desconto_pix"] == formatar_brl(preco_pix(produto.preco)[0])

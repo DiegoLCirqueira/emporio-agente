@@ -80,6 +80,16 @@ def formatar_brl(valor: Decimal) -> str:
     return f"{sinal}R$ {int(inteiro):,}".replace(",", ".") + f",{decimais}"
 
 
+def preco_pix(preco_aplicavel: Decimal) -> tuple[Decimal, Decimal]:
+    """Única regra do PIX (T28): (desconto, preço PIX).
+
+    desconto = arredondar(preço * 5%) em centavos (ROUND_HALF_UP); PIX = preço - desconto.
+    Ex.: 579,90 -> desconto 29,00 -> PIX 550,90. O preço aplicável é o de tabela (PIX não soma com promoção).
+    """
+    desconto = arredondar(preco_aplicavel * DESCONTO_PIX)
+    return desconto, arredondar(preco_aplicavel) - desconto
+
+
 def normalizar(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", " ", sem_acento.lower()).strip()
@@ -387,7 +397,7 @@ class Ferramentas:
                 "O desconto de 5% do PIX não se soma à promoção: vale o preço promocional em qualquer forma de pagamento."
             )
         else:
-            visao["preco_pix"] = formatar_brl(arredondar(p.preco * (1 - DESCONTO_PIX)))
+            visao["preco_pix"] = formatar_brl(preco_pix(p.preco)[1])
         if detalhado:
             visao["descricao"] = p.descricao
             visao["especificacoes"] = p.specs
@@ -622,8 +632,7 @@ class Ferramentas:
             if promocao:
                 observacoes.append("O desconto de 5% do PIX não se soma à promoção; vale o preço promocional.")
             else:
-                desconto = arredondar(base * DESCONTO_PIX)
-                final = base - desconto
+                desconto, final = preco_pix(base)
                 resposta["desconto_pix"] = formatar_brl(desconto)
         resposta["valor_final"] = formatar_brl(final)
 
