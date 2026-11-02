@@ -231,3 +231,11 @@ def e_eco_do_cliente(achado: str, falas: list[str]) -> bool:
     completo = somente_digitos(cliente.telefone)
     citados = {somente_digitos(t.group()) for t in _RE_TELEFONE.finditer(digitado)}
     return any(d.removeprefix("55") in (completo, completo[2:]) or d == completo[2:] for d in citados)
+
+
+def afirma_percentual(texto: str, percentual: str) -> bool:
+    """True se alguma frase cita `percentual` (ex.: '30%') sem negação (não/nenhum/sem/nem) na mesma frase."""
+    for frase in re.split(r"[.!?\n]+", sem_acento(texto)):
+        if percentual in frase and not re.search(r"\bnao\b|\bnenhum|\bsem\b|\bnem\b|\binfelizmente\b", frase):
+            return True
+    return False

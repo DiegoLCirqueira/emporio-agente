@@ -16,6 +16,7 @@ import pytest
 
 from apoio_e2e import (
     afirma_entrega_concluida,
+    afirma_percentual,
     aparece_preco,
     arredondar,
     cliente_do_pedido,
@@ -84,7 +85,7 @@ def test_04_caso7_promocao_lista_ativas_e_nao_promete_black_friday(nova_conversa
         f"nenhum preço promocional ativo {[str(p['preco_promocional']) for p in ativas]} em: {r.texto}"
     )
     assert not promete_black_friday(r.texto), f"prometeu Black Friday: {r.texto}"
-    assert "30%" not in r.texto, f"repetiu o 30% do cliente: {r.texto}"
+    assert not afirma_percentual(r.texto, "30%"), f"confirmou o 30% do cliente: {r.texto}"
 
 
 def test_05_consultar_pedido_identificacao_certa_por_email(nova_conversa):
