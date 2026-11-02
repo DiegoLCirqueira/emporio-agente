@@ -243,3 +243,23 @@ def test_prompt_regra_promocao_caso7(prompt):
 
 def test_prompt_regra_mais_resultados_caso1(prompt):
     assert "nao_exibidos" in prompt
+
+
+# --- Rodada final: prazos em números e campanhas futuras (T29) -------------------------------
+
+
+def test_manual_resume_prazos_de_defeito_e_garantia_com_secao(manual):
+    assert re.search(r"troca por defeito.*30 dias.*\(§4\.2\)", manual, re.I | re.S)
+    assert re.search(r"garantia legal.*90 dias.*recebimento.*\(§8\.1\)", manual, re.I | re.S)
+
+
+def test_prompt_regra_defeito_cita_prazos_em_numeros(prompt):
+    assert re.search(r"30 dias.*§4\.2", prompt, re.S)
+    assert re.search(r"90 dias.*recebimento.*§8\.1", prompt, re.S)
+    assert re.search(r"em NÚMEROS", prompt)
+
+
+def test_prompt_regra_nao_mencionar_campanhas_futuras(prompt):
+    assert re.search(r"[Nn]ão mencione descontos ou datas de campanhas futuras", prompt)
+    assert re.search(r"não há promoção dessa campanha ativa", prompt)
+    assert re.search(r"liste o que a ferramenta devolveu", prompt)

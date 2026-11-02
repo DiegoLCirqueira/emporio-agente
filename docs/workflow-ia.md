@@ -208,3 +208,11 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
   - 13 (garantia): a resposta cita o 31º e o 90º dia, mas não diz os prazos de 30 e 90 dias em números; o regex do teste também não casava "90º".
 - **Estado atual:** código e testes unitários em 310 verdes; e2e escritos e commitados com os 4 ❌ documentados acima, nada corrigido (o Diego pediu parar no relatório).
 - **Próximo passo (a decidir pelo Diego):** (1) regra de arredondamento do PIX; (2) reforço no prompt para não mencionar descontos de campanhas futuras e para citar os prazos de 30/90 dias; (3) ajustar os critérios dos cenários 05 e 13 e rerodar 04, 05, 08 e 13; depois, as conversas de exemplo em `conversas/` e o README final.
+
+### 2026-11-02 — Reta final, passo 1: PIX único e regras de prompt
+
+- **Diego decidiu:** uma única função de preço PIX (desconto arredondado em centavos com `ROUND_HALF_UP`, PIX = preço − desconto), e duas regras novas de prompt (nada de campanhas futuras; prazos de defeito e garantia em números).
+- **Python (TDD):** o vermelho foi um `ImportError` de `preco_pix` (todo o arquivo de testes de pagamento) mais 3 falhas em `test_politicas.py`. Depois do verde, a suíte unitária fechou em **381 passed**, e nenhum teste antigo precisou mudar. O teste parametrizado cobre todos os produtos do CSV: busca, detalhe e `calcular_pagamento` dão o mesmo PIX.
+- **Registro:** T28 (revoga a divergência 550,90 × 550,91) e T29 em `docs/decisoes.md`; resumo dos prazos (§4.2, §8.1) em `politicas.md`.
+- **Estado atual:** código e testes unitários prontos, sem commit. README e `tests/e2e/` não foram tocados.
+- **Próximo passo:** o Orchestrator comita; depois rodar a regressão e os e2e com o modelo real e alinhar o README.

@@ -70,6 +70,8 @@ A loja segue o Código de Defesa do Consumidor (Lei nº 8.078/90). (§4)
 - Depois de 30 dias, o cliente deve acionar a garantia diretamente com o fabricante. A Empório da Música pode intermediar o processo mediante solicitação.
 - Não são cobertos danos por mau uso, quedas, exposição a umidade excessiva ou modificações não autorizadas.
 
+**Resumo dos prazos (sem inventar nada além do texto acima):** troca por defeito em até 30 dias da compra (§4.2); garantia legal de 90 dias a partir do recebimento (§8.1).
+
 > Nota de curadoria (DD6): o §4.2 dá 30 dias a partir da compra para troca por defeito e manda acionar o fabricante depois disso, enquanto o §8.1 garante 90 dias de garantia legal a partir do recebimento. Para defeito relatado entre o 31º e o 90º dia, informe as duas regras (§4.2 e §8.1) e encaminhe o caso para atendimento humano, sem decidir.
 
 ### Trocas por preferência (§4.3)
