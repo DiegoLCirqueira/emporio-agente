@@ -92,7 +92,7 @@ def test_05_consultar_pedido_identificacao_certa_por_email(nova_conversa):
     pedido = pedido_csv(12)  # confirmado, R$ 599, sem rastreio
     titular = cliente_do_pedido(12)
     c = nova_conversa()
-    r = c.diga(f"Quero saber o status do meu pedido 12. Meu e-mail cadastrado é {titular.email}")
+    r = c.diga(f"Quero saber o status e o valor total do meu pedido 12. Meu e-mail cadastrado é {titular.email}")
     consultas = [f for f in c.ferramentas_chamadas if f.nome == "consultar_pedido"]
     assert consultas and consultas[-1].ok, c.ferramentas_chamadas
     assert "confirmad" in sem_acento(r.texto), r.texto
@@ -139,7 +139,8 @@ def test_07_identificacao_errada_nao_revela_nada(nova_conversa):
 def test_08_calcular_pagamento_pix(nova_conversa):
     """calcular_pagamento: PIX com 5% de desconto sobre o preço de tabela (Giannini GF-1R, sem promoção)."""
     produto = produto_csv("Giannini GF-1R")
-    esperado = arredondar(preco(produto) * Decimal("0.95"))
+    # Regra única: desconto de 5% arredondado HALF_UP e subtraído do preço (579,90 -> 29,00 -> 550,90).
+    esperado = preco(produto) - arredondar(preco(produto) * Decimal("0.05"))
     c = nova_conversa()
     r = c.diga("Quanto fica o violão Giannini GF-1R se eu pagar no PIX?")
     assert "calcular_pagamento" in c.nomes_chamados, c.nomes_chamados
@@ -200,7 +201,9 @@ def test_13_garantia_defeito_entre_31_e_90_dias(nova_conversa):
     c = nova_conversa()
     r = c.diga("Comprei um violão na loja há 60 dias e ele apareceu com defeito de fabricação. O que eu faço?")
     texto = sem_acento(r.texto)
-    assert re.search(r"\b30\b", texto) and re.search(r"\b90\b", texto), f"esperava 30 e 90 dias: {r.texto}"
+    # sem_acento transforma "90º" em "90o": usa borda de dígito em vez de \b.
+    assert re.search(r"(?<!\d)30(?!\d)", texto), f"esperava o prazo de 30 dias (§4.2): {r.texto}"
+    assert re.search(r"(?<!\d)90(?!\d)", texto), f"esperava o prazo de 90 dias (§8.1): {r.texto}"
     assert tem_contato_da_loja(r.texto) or "equipe" in texto or "atendimento" in texto, r.texto
 
 
