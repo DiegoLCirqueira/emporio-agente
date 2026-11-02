@@ -44,7 +44,7 @@ Requisitos: Python 3.12+ e uma chave **gratuita** do Gemini, criada em <https://
    ```dotenv
    EMPORIO_PROVEDOR=gemini
    GEMINI_API_KEY=<sua-chave>
-   EMPORIO_MODELO=                 # vazio = gemini-3.8-flash
+   EMPORIO_MODELO=                 # vazio = gemini-3.5-flash-lite
    ANTHROPIC_API_KEY=              # opcional; só com EMPORIO_PROVEDOR=anthropic
    REFERENCE_DATE=2026-03-31
    HISTORICO_MAX_TURNOS=10
@@ -78,7 +78,7 @@ Fluxo de uma mensagem: o loop envia o histórico ao modelo por uma interface de 
 ```mermaid
 flowchart TD
   U[Mensagem do cliente] --> L[Loop de function calling<br/>máx. 5 iterações]
-  L --> M[Modelo<br/>Gemini 3.8 Flash por padrão;<br/>provedor configurável]
+  L --> M[Modelo<br/>Gemini 3.5 Flash-Lite por padrão;<br/>provedor configurável]
   P[System prompt: persona, escopo,<br/>REFERENCE_DATE e politicas.md] --> M
   M -->|pede ferramenta| T[Ferramentas sobre CSV em memória]
   T -->|resultado JSON| L
@@ -131,13 +131,13 @@ Contexto que pesa em todas as decisões: prazo de **2 dias**, dados pequenos (65
 
 ### D4. Gemini no free tier, com interface de provedor fina
 
-- **Decisão:** provedor padrão **Gemini** (`EMPORIO_PROVEDOR=gemini`) no free tier do Google AI Studio, modelo `gemini-3.8-flash`. Alternativa documentada: `gemini-3.5-flash-lite`. O modelo pode ser trocado em `EMPORIO_MODELO`; vazio vale o padrão do provedor.
+- **Decisão:** provedor padrão **Gemini** (`EMPORIO_PROVEDOR=gemini`) no free tier do Google AI Studio, modelo padrão `gemini-3.5-flash-lite` (revisado em 2026-11-02). Alternativa documentada: `gemini-3.8-flash`, que no teste de 2026-11-01 ficou **indisponível no free tier** (503 em ~3 s por sobrecarga e 504 em ~60 s por prazo, nas 12 chamadas do roteiro); o Flash-Lite rodou as 12 conversas sem 400 e sem 429. O modelo pode ser trocado em `EMPORIO_MODELO`; vazio vale o padrão do provedor.
 - **Histórico da decisão:** a escolha original era Claude Haiku 5.5 (US$ 0,10 / US$ 0,50 por 1M tokens de input/output, conferido em 01/11/2026 em <https://platform.claude.com/docs/en/about-claude/pricing>). O Diego mudou para **nenhuma API paga**, e o Gemini virou o padrão.
-- **Por quê:** custo zero para o Diego e para o avaliador, que só precisa criar uma chave gratuita no AI Studio, sem cartão. O Gemini 3.8 Flash é estável e declara suporte a function calling.
+- **Por quê:** custo zero para o Diego e para o avaliador, que só precisa criar uma chave gratuita no AI Studio, sem cartão. O `gemini-3.5-flash-lite` está no free tier e completou o roteiro de teste; o `gemini-3.8-flash` é estável e declara suporte a function calling, mas ficou indisponível no teste.
 - **SDK:** `google-genai` 2.31.0, publicada em 2026-10-14, a versão estável mais recente com pelo menos 2 semanas de lançamento (<https://pypi.org/project/google-genai/#history>).
 - **Fontes oficiais** (acessadas em 01/11/2026):
-  - Preço: <https://ai.google.dev/gemini-api/docs/pricing> (coluna Free Tier "Free of charge" para o Gemini 3.8 Flash e para o `gemini-3.5-flash-lite`).
-  - Modelo: <https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash> (Stable; "Function calling: Supported").
+  - Preço: <https://ai.google.dev/gemini-api/docs/pricing> (coluna Free Tier "Free of charge" para o `gemini-3.5-flash-lite` e para o Gemini 3.8 Flash).
+  - Modelo (alternativa documentada): <https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash> (Stable; "Function calling: Supported").
   - Chave e cobrança: <https://ai.google.dev/gemini-api/docs/api-key> e <https://ai.google.dev/gemini-api/docs/billing>. Nenhuma exige cartão para o free tier (inferido pela ausência da exigência).
   - Região e idade: <https://ai.google.dev/gemini-api/docs/available-regions> lista o Brasil; os termos exigem 18 anos ou mais.
 - **Limites de uso:** a documentação (<https://ai.google.dev/gemini-api/docs/rate-limits>) **não publica** RPM, TPM nem RPD do free tier; manda consultar <https://aistudio.google.com/rate-limit>, logado. Os limites valem por projeto, e a cota diária reinicia à meia-noite do horário do Pacífico. Os números de uma conta específica não foram verificados. O adaptador trata o 429 com até 4 tentativas e espera exponencial com jitter, respeitando o `retryDelay`. Com a cota esgotada, o agente mostra uma mensagem própria ("limite de uso atingido") e os contatos humanos.
@@ -173,28 +173,28 @@ Detalhada na seção [Avaliação](#avaliação).
 
 Os 6 CSVs estão limpos no formato (UTF-8, sem órfãos, duplicados ou nulos inesperados). Os problemas são **semânticos**: promoções sem vigência, status × estoque contraditórios, totais que não batem e pedidos defasados. Relatório completo: [`docs/exploracao-dados.md`](docs/exploracao-dados.md). O script de perfil é reproduzível: `python scripts/explorar_dados.py` (só stdlib). Os arquivos em `data/` **não são alterados**; todo tratamento acontece em tempo de execução, no código.
 
-Status: **planejado** = decidido em `docs/decisoes.md`, ainda não implementado nem testado. Será atualizado conforme a implementação.
+Status: **implementado** = tratado no código ou nas políticas e coberto por teste unitário. **planejado** = decidido em `docs/decisoes.md`, mas hoje só como regra de prompt, sem teste unitário de comportamento (verificação nos cenários e2e). Será atualizado conforme a avaliação.
 
 | # | Problema | Tratamento adotado | Status |
 |---|---|---|---|
-| 1 | Promoções sem vigência; o PDF promete Black Friday em novembro | Só `is_active=1` vale; o agente nunca promete desconto inativo (DD2) | planejado |
-| 2 | Pedidos defasados em relação a hoje | Data de referência configurável, `REFERENCE_DATE=2026-03-31` (DD1) | planejado |
+| 1 | Promoções sem vigência; o PDF promete Black Friday em novembro | Só `is_active=1` vale; o agente nunca promete desconto inativo (DD2) | implementado |
+| 2 | Pedidos defasados em relação a hoje | Data de referência configurável, `REFERENCE_DATE=2026-03-31` (DD1) | implementado |
 | 3 | Arrependimento não calculável (sem canal nem data de entrega) | Agente pergunta data de recebimento e canal; na dúvida, humano (DD3) | planejado |
-| 4 | Status × estoque inconsistentes (produtos 96, 136, 130) | Disponível = `active` e `stock>0`; o 130 aparece como "em breve" (DD9) | planejado |
-| 5 | Categorias do PDF sem produtos (sopro, cordas orquestrais) | O CSV é a fonte de verdade; responde "não temos no momento" e não inventa item | planejado |
-| 6 | Telefone/WhatsApp duplicado no PDF | Telefone (67) 3341-4444 e WhatsApp (67) 3321-4500 (DD4) | planejado |
-| 7 | Parcelamento contraditório (§3 × §3.1) | Vale o §3.1: até 3x mín. R$50; 4–6x mín. R$80; 7–12x mín. R$100 (DD5) | planejado |
-| 8 | Troca por defeito (30 dias) × garantia legal (90 dias) | Informa as duas regras (§4.2 e §8.1) e encaminha para humano (DD6) | planejado |
+| 4 | Status × estoque inconsistentes (produtos 96, 136, 130) | Disponível = `active` e `stock>0`; o 130 aparece como "em breve" (DD9) | implementado |
+| 5 | Categorias do PDF sem produtos (sopro, cordas orquestrais) | O CSV é a fonte de verdade; responde "não temos no momento" e não inventa item | implementado |
+| 6 | Telefone/WhatsApp duplicado no PDF | Telefone (67) 3341-4444 e WhatsApp (67) 3321-4500 (DD4) | implementado |
+| 7 | Parcelamento contraditório (§3 × §3.1) | Vale o §3.1: até 3x mín. R$50; 4–6x mín. R$80; 7–12x mín. R$100 (DD5) | implementado |
+| 8 | Troca por defeito (30 dias) × garantia legal (90 dias) | Informa as duas regras (§4.2 e §8.1) e encaminha para humano (DD6) | implementado |
 | 9 | Bases de prazo e limites indefinidos ("acima de R$ 500", "feriados") | Suposições explícitas (ver [Limitações](#limitações-conhecidas-e-próximos-passos)); comparação estrita; sem calendário de feriados | planejado |
-| 10 | Totais de pedido não batem com os itens (pedidos 3 e 20) | `orders.total_brl` é o valor pago, sem comentar a divergência (DD8) | planejado |
+| 10 | Totais de pedido não batem com os itens (pedidos 3 e 20) | `orders.total_brl` é o valor pago, sem comentar a divergência (DD8) | implementado |
 | 11 | Pedidos fora das regras do PDF (PIX sem 5%, parcela abaixo do mínimo) | Apenas alerta de dado sintético; o agente não audita o pedido do cliente | planejado |
-| 12 | E-mail não é único (clientes 11 e 43) | Identificação por `order_id` + telefone **ou** e-mail, com match exato na ferramenta (DD7) | planejado |
-| 13 | Nomes ambíguos e sem acento | Nunca buscar cliente por nome; busca de produto normalizada (sem acento, minúsculas) | planejado |
-| 14 | Promoções sobrepostas no histórico | Com mais de uma ativa, aplica o maior desconto, sem somar (DD2) | planejado |
+| 12 | E-mail não é único (clientes 11 e 43) | Identificação por `order_id` + telefone **ou** e-mail, com match exato na ferramenta (DD7) | implementado |
+| 13 | Nomes ambíguos e sem acento | Nunca buscar cliente por nome; busca de produto normalizada (sem acento, minúsculas) | implementado |
+| 14 | Promoções sobrepostas no histórico | Com mais de uma ativa, aplica o maior desconto, sem somar (DD2) | implementado |
 | 15 | "Venda final" (§4.4) não existe nos dados | Não afirma inelegibilidade por esse motivo; encaminha para humano | planejado |
-| 16 | Marca não é coluna; "7 Cordas" no nome | Busca textual normalizada em `name` + `description`; filtro de acessório não casa com "cordas" no nome do produto | planejado |
-| 17 | Tipos mistos de preço e `specs` heterogêneos | `Decimal` ao carregar, "R$ 1.234,56" só na saída, `specs` lido como dict | planejado |
-| 18 | E-mail com acento no PDF | Usa `contato@emporiodamusica.com.br` (DD4) | planejado |
+| 16 | Marca não é coluna; "7 Cordas" no nome | Busca textual normalizada em `name` + `description`; filtro de acessório não casa com "cordas" no nome do produto | implementado |
+| 17 | Tipos mistos de preço e `specs` heterogêneos | `Decimal` ao carregar, "R$ 1.234,56" só na saída, `specs` lido como dict | implementado |
+| 18 | E-mail com acento no PDF | Usa `contato@emporiodamusica.com.br` (DD4) | implementado |
 
 ### Suposições (DD1–DD9)
 
@@ -229,9 +229,10 @@ Limitações:
 - **Sem RAG:** as políticas cabem inteiras no prompt. Não escala para manuais grandes (ver D3).
 - **Sem persistência entre sessões:** o histórico vive em memória durante a sessão. Num atendimento real o estado ficaria no canal (WhatsApp).
 - **Limites do free tier não verificados:** a documentação não publica RPM/TPM/RPD. Há instabilidade do serviço: 503/504 foram observados no teste de fumaça, e o adaptador repete a chamada (429 e 5xx, até 4 tentativas). No pior caso, um turno pode demorar alguns minutos.
+- **Latência alta no free tier:** com o `gemini-3.5-flash-lite`, os turnos levaram de **7 a 52 s** cada (roteiro de 2026-11-01/02). Aceitável para a demonstração, não para atendimento em tempo real.
 - **Adaptador Anthropic não validado:** só foi exercitado com testes simulados, nunca com chamadas reais.
 - **Dados enviados ao Google no free tier:** o Google pode usar entradas e saídas para melhorar seus modelos, com possível revisão humana. Aceitável com dados fictícios; inadequado para clientes reais (LGPD).
-- **O agente não conhece a hora do dia, só a data:** não afirma se a loja está aberta agora; informa o horário do dia (T11 em `docs/decisoes.md`). Limitação atual, ponto a ser decidido pelo Diego.
+- **Hora e "loja aberta agora" calculadas pelo código (T23 em `docs/decisoes.md`):** o modelo não tem relógio, então `horario.py` calcula se a loja está aberta ou fechada (§2, fuso America/Campo_Grande) e entrega o fato pronto no prompt a cada turno. O relógio usa a data de referência (`REFERENCE_DATE`) com a hora real no fuso de Campo Grande; `EMPORIO_AGORA` (AAAA-MM-DDTHH:MM) fixa o instante em testes e demonstrações. O cálculo usa só o horário semanal e **não conhece feriados** (o agente avisa e sugere confirmar).
 - **Dados sintéticos com inconsistências:** totais de pedido que não batem, PIX sem desconto, parcelas abaixo do mínimo. O agente usa `orders.total_brl` e não audita pedidos.
 - **Sem data real de entrega nem canal de compra:** o direito de arrependimento (7 dias após o recebimento, só online) depende de perguntar ao cliente.
 - **Sem flag de "venda final":** o §4.4 não é verificável nos dados.
