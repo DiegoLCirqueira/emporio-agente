@@ -223,3 +223,11 @@ Registro de como os assistentes de código foram usados neste projeto: quem fez 
 - **Avaliação e2e (modelo `gemini-3.5-flash-lite`):** 3 rodadas completas (11/15, 14/15 e 14/15), sem falhas por 503, 504 ou 429 e com 0 vazamentos de PII. Os cenários instáveis foram o 04 e o 13. Depois do ajuste final dos critérios e da fórmula do 13 não houve nova rodada completa, só repetições dos cenários afetados.
 - **Docs/QA:** README final com os resultados e2e, a lista das 4 conversas de exemplo e as limitações novas (ordem válida → inválida na identificação). Suíte unitária: 382 passed.
 
+### 2026-11-02 — Rodada final e encerramento
+
+- **Diego pediu:** teste de fumaça, uma rodada completa dos e2e sem corrigir nada, atualização do README e checagem final; e encerrar o projeto sem mais alterações depois do relatório. Também proibiu abrir, ler ou editar o `.env`: a configuração foi confirmada só pela CLI.
+- **Fumaça (Orchestrator):** `emporio-agente -m "qual o endereço da loja?"` respondeu em ~9 s, sem ferramenta, com o endereço correto.
+- **Rodada final (AI Engineer):** `pytest tests/e2e -m e2e`, com prompt e critérios atuais: **15/15 passaram**, 0 vazamentos de PII, 0 ecos do cliente, nenhuma falha por 503, 504 ou 429, 173 s.
+- **Docs/QA e Orchestrator:** a seção de avaliação do README passou a registrar 4 rodadas completas (11/15, 14/15, 14/15 e 15/15), com as taxas por cenário atualizadas; o aviso de que não houve rodada completa após os últimos ajustes foi removido.
+- **Estado atual:** projeto encerrado. Não há próximo passo planejado.
+

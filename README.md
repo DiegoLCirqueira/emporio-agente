@@ -237,17 +237,17 @@ Estratégia (D7), em duas camadas com pytest:
 
 ### Resultados dos cenários e2e
 
-Modelo `gemini-3.5-flash-lite`, 15 cenários. Foram feitas **3 rodadas completas** (run1: 11/15; run3: 14/15; run4: 14/15), mais repetições dos cenários que falharam. A rodada completa levou de 127 a 189 s. Não houve nenhuma falha por 503, 504 ou 429.
+Modelo `gemini-3.5-flash-lite`, 15 cenários. Foram feitas **4 rodadas completas** (run1: 11/15; run3: 14/15; run4: 14/15; **rodada final: 15/15**), mais repetições dos cenários que falharam. A rodada completa levou de 127 a 189 s (a final, 173 s no pytest). Não houve nenhuma falha por 503, 504 ou 429.
 
-**Depois do último ajuste (critério do 04 e fórmula do 13), não houve nova rodada completa dos 15**: só as repetições citadas na tabela.
+**Rodada final (2026-11-02, prompt e critérios atuais, sem nenhuma correção entre a execução e o registro): 15/15 passaram**, sem falha por 503, 504 ou 429 e com 0 vazamentos de PII. É a única rodada completa feita depois dos últimos ajustes (critério do 04 e fórmula do 13); as taxas abaixo somam essa rodada.
 
 | Cenário | Resultado |
 |---|---|
-| 01, 02, 03, 06, 07, 09, 10, 11, 12, 14, 15 | 3/3 nas 3 rodadas completas |
-| 04 promoção e Black Friday | Antes do reforço de prompt, 1 falha real do agente ("Black Friday e seus descontos maiores ficam para novembro"). Depois do reforço, o agente respondeu corretamente em 9/9 execuções. Medido literalmente, 8/9: a falha foi do critério, que reprovava a negação "não temos descontos de 30%". Com o critério atual, 3/3 |
-| 05 status e total do pedido 12 | 1 falha por critério (o cliente não pedira o total). 4/4 depois do ajuste |
-| 08 PIX | 1 falha por defeito real do código (R$ 550,90 × R$ 550,91). 4/4 depois da regra única (D9) |
-| 13 garantia | 7/8 no total. A falha foi o agente citar só os 90 dias. 4/4 depois da fórmula obrigatória no prompt |
+| 01, 02, 03, 06, 07, 09, 10, 11, 12, 14, 15 | 4/4 nas 4 rodadas completas |
+| 04 promoção e Black Friday | Antes do reforço de prompt, 1 falha real do agente ("Black Friday e seus descontos maiores ficam para novembro"). Depois do reforço, o agente respondeu corretamente em 10/10 execuções. Medido literalmente com os critérios da época, 9/10: a falha foi do critério, que reprovava a negação "não temos descontos de 30%". Com o critério atual, 4/4 (3 repetições e a rodada final) |
+| 05 status e total do pedido 12 | 1 falha por critério (o cliente não pedira o total). 5/5 depois do ajuste (4 anteriores e a rodada final) |
+| 08 PIX | 1 falha por defeito real do código (R$ 550,90 × R$ 550,91). 5/5 depois da regra única (D9) |
+| 13 garantia | 8/9 no total. A falha foi o agente citar só os 90 dias. 5/5 depois da fórmula obrigatória no prompt |
 
 **Varredura de PII:** 0 vazamentos e 0 ecos do cliente em todas as rodadas.
 
